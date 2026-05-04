@@ -1,13 +1,16 @@
 import type { Route } from "./+types/home";
-// import { Welcome } from "../welcome/welcome";
+import { WelcomeScreen } from "../components/WelcomeScreen";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "Movely | Bem-vindo" },
+    {
+      name: "description",
+      content: "Conheça o Movely antes de entrar.",
+    },
   ];
 }
 
 export default function Home() {
-  // return <Welcome />;
+  return <WelcomeScreen />;
 }
