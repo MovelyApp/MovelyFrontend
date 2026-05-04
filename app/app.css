@@ -581,6 +581,387 @@ button {
   margin-top: 0;
 }
 
+.group-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 32px 18px;
+  background:
+    linear-gradient(145deg, rgba(238, 237, 254, 0.76), transparent 36%),
+    linear-gradient(320deg, rgba(206, 203, 246, 0.58), transparent 34%),
+    var(--movely-deep);
+}
+
+.group-phone {
+  width: min(430px, 100%);
+  min-height: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px 20px 22px;
+  color: #ffffff;
+  background:
+    linear-gradient(180deg, rgba(60, 52, 137, 0.98), rgba(38, 33, 92, 0.98)),
+    var(--movely-deep);
+  border: 1px solid rgba(175, 169, 236, 0.34);
+  border-radius: 28px;
+  box-shadow: 0 30px 84px rgba(13, 10, 44, 0.32);
+}
+
+.group-topbar {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.group-topbar p,
+.group-topbar h1 {
+  margin: 0;
+}
+
+.group-topbar p {
+  color: rgba(250, 250, 248, 0.66);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.group-topbar h1 {
+  margin-top: 2px;
+  color: var(--color-offwhite, #fafaf8);
+  font-size: 26px;
+  line-height: 1.04;
+  font-weight: 900;
+}
+
+.group-back-button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #ffffff;
+  background: rgba(250, 250, 248, 0.1);
+  border: 1px solid rgba(175, 169, 236, 0.38);
+  border-radius: 14px;
+  font-size: 22px;
+  font-weight: 900;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.group-back-button:hover {
+  background: var(--movely-primary-hover);
+  transform: translateY(-1px);
+}
+
+.group-form {
+  display: grid;
+  gap: 16px;
+}
+
+.group-photo-button {
+  width: 118px;
+  height: 118px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  overflow: hidden;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(250, 250, 248, 0.18), transparent 32%),
+    var(--movely-primary);
+  border: 1px solid rgba(175, 169, 236, 0.62);
+  border-radius: 999px;
+  box-shadow:
+    0 20px 42px rgba(18, 14, 64, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.group-photo-button:hover {
+  background: var(--movely-primary-hover);
+  transform: translateY(-1px);
+}
+
+.group-photo-button img,
+.group-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.group-photo-button span {
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.group-photo-help {
+  margin: -8px 0 2px;
+  color: rgba(250, 250, 248, 0.7);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.group-field > span {
+  color: rgba(250, 250, 248, 0.82);
+}
+
+.group-field input,
+.group-field textarea {
+  color: #ffffff;
+  background: rgba(250, 250, 248, 0.09);
+  border-color: rgba(175, 169, 236, 0.32);
+}
+
+.group-field textarea {
+  width: 100%;
+  min-height: 116px;
+  min-width: 0;
+  padding: 16px;
+  resize: none;
+  border: 1px solid rgba(175, 169, 236, 0.32);
+  border-radius: 16px;
+  outline: none;
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.group-field input::placeholder,
+.group-field textarea::placeholder {
+  color: rgba(250, 250, 248, 0.42);
+}
+
+.group-field input:hover,
+.group-field textarea:hover,
+.group-field input:focus,
+.group-field textarea:focus {
+  background: rgba(250, 250, 248, 0.13);
+  border-color: var(--movely-lavender);
+  box-shadow: 0 0 0 4px rgba(175, 169, 236, 0.14);
+}
+
+.group-preview-card,
+.group-current-card,
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: rgba(250, 250, 248, 0.1);
+  border: 1px solid rgba(175, 169, 236, 0.28);
+  border-radius: 20px;
+}
+
+.group-preview-card p,
+.group-current-card p,
+.member-row p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.group-preview-card span,
+.group-current-card span,
+.member-row span {
+  display: block;
+  margin-top: 3px;
+  color: rgba(250, 250, 248, 0.66);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.group-preview-card > div:last-child,
+.group-current-card > div:last-child,
+.member-row > div:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.group-preview-card p,
+.group-preview-card span,
+.group-current-card p,
+.group-current-card span,
+.member-row p,
+.member-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+  color: var(--movely-deep);
+  background: var(--movely-lavender-card);
+  border: 1px solid rgba(250, 250, 248, 0.24);
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.group-avatar.large {
+  width: 96px;
+  height: 96px;
+  font-size: 28px;
+}
+
+.group-avatar.green {
+  background: var(--movely-green-soft);
+  color: var(--movely-green);
+}
+
+.group-avatar.blue {
+  background: var(--movely-blue-soft);
+  color: var(--movely-blue);
+}
+
+.group-avatar.pink {
+  background: var(--movely-pink-soft);
+  color: var(--movely-pink);
+}
+
+.group-avatar.amber {
+  background: var(--movely-amber-soft);
+  color: var(--movely-amber);
+}
+
+.group-search {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  color: rgba(250, 250, 248, 0.72);
+  background: rgba(250, 250, 248, 0.1);
+  border: 1px solid rgba(175, 169, 236, 0.3);
+  border-radius: 18px;
+}
+
+.group-search span {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.group-search input {
+  width: 100%;
+  min-width: 0;
+  color: #ffffff;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.group-search input::placeholder {
+  color: rgba(250, 250, 248, 0.48);
+}
+
+.group-section {
+  display: grid;
+  gap: 12px;
+}
+
+.group-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.group-section-heading h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.group-section-heading > span {
+  min-width: 34px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--movely-deep);
+  background: var(--movely-lavender-card);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.member-list {
+  display: grid;
+  gap: 10px;
+}
+
+.invite-button {
+  height: 38px;
+  padding: 0 14px;
+  flex: 0 0 auto;
+  color: #ffffff;
+  background: var(--movely-primary);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.invite-button:hover {
+  background: var(--movely-primary-hover);
+  transform: translateY(-1px);
+}
+
+.invite-button.invited {
+  color: var(--movely-deep);
+  background: var(--movely-lavender-card);
+  cursor: default;
+  transform: none;
+}
+
+.remove-member-button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #ffffff;
+  background: rgba(250, 250, 248, 0.09);
+  border: 1px solid rgba(175, 169, 236, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 900;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.remove-member-button:hover {
+  color: var(--movely-deep);
+  background: var(--movely-lavender-card);
+}
+
+.group-bottom-button {
+  margin-top: auto;
+}
+
 @media (max-width: 860px) {
   .auth-page {
     padding: 0;
@@ -608,6 +989,19 @@ button {
   }
 
   .welcome-card {
+    width: 100%;
+    min-height: 100svh;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .group-page {
+    padding: 0;
+    background: var(--movely-deep);
+  }
+
+  .group-phone {
     width: 100%;
     min-height: 100svh;
     border: 0;
@@ -657,5 +1051,21 @@ button {
 
   .welcome-copy > p:last-child {
     font-size: 16px;
+  }
+
+  .group-phone {
+    padding: 22px 18px 20px;
+  }
+
+  .group-topbar h1 {
+    font-size: 23px;
+  }
+
+  .member-row {
+    padding: 12px;
+  }
+
+  .invite-button {
+    padding: 0 12px;
   }
 }
