@@ -6,3 +6,6 @@ venv
 # React Router
 /.react-router/
 /build/
+
+# Local dev server logs
+dev-server*.log
