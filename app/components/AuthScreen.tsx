@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 type AuthMode = "login" | "register";
 type RequestStatus = "idle" | "submitting" | "success" | "error";
@@ -52,6 +52,7 @@ function getFriendlyError(message: string) {
 }
 
 export function AuthScreen({ mode }: AuthScreenProps) {
+  const navigate = useNavigate();
   const copy = authCopy[mode];
   const isRegister = mode === "register";
   const [username, setUsername] = useState("");
@@ -113,6 +114,11 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
       setStatus("success");
       setMessage(copy.success);
+
+      if (!isRegister) {
+        navigate("/dashboard");
+        return;
+      }
 
       if (isRegister) {
         setPassword("");
