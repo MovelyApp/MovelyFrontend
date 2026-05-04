@@ -4,4 +4,7 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("cadastro", "routes/cadastro.tsx"),
+  // route("groups", "routes/groups.tsx"),
+  // route("register-activity", "routes/register-activity.tsx"),
+  // route("profile", "routes/profile.tsx"),
 ] satisfies RouteConfig;
