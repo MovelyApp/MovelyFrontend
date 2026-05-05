@@ -118,7 +118,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
         },
       );
 
-      const responseText = await response.text();
+      const responseText = await response.json();
 
       if (!response.ok) {
         throw new Error(responseText || response.statusText);
