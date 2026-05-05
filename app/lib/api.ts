@@ -137,6 +137,147 @@ export function clearToken() {
   window.sessionStorage.removeItem("token");
 }
 
+export function getFriendlyErrorMessage(
+  message: string,
+  fallback = "Não foi possível concluir agora. Tente novamente.",
+) {
+  let rawMessage = (message || "").trim();
+
+  if (rawMessage.startsWith("{")) {
+    try {
+      const data = JSON.parse(rawMessage) as {
+        message?: string;
+        mensagem?: string;
+        error?: string;
+      };
+      rawMessage = data.message ?? data.mensagem ?? data.error ?? rawMessage;
+    } catch {
+      // Keep the original text when it is not valid JSON.
+    }
+  }
+
+  const normalizedMessage = rawMessage.toLowerCase();
+
+  if (!rawMessage) {
+    return fallback;
+  }
+
+  if (normalizedMessage.includes("<!doctype html") || normalizedMessage.includes("<html")) {
+    return "O servidor respondeu de um jeito inesperado. Tente atualizar a página.";
+  }
+
+  if (
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("networkerror") ||
+    normalizedMessage.includes("load failed") ||
+    normalizedMessage.includes("econnrefused")
+  ) {
+    return "Não consegui conectar ao servidor do Movely. Tente novamente em instantes.";
+  }
+
+  if (normalizedMessage.includes("bad gateway") || normalizedMessage.includes("502")) {
+    return "O servidor do Movely não respondeu agora. Tente novamente em instantes.";
+  }
+
+  if (
+    normalizedMessage.includes("bad credentials") ||
+    normalizedMessage.includes("invalid credentials")
+  ) {
+    return "Email ou senha inválidos.";
+  }
+
+  if (
+    normalizedMessage.includes("nao retornou um token") ||
+    normalizedMessage.includes("não retornou um token")
+  ) {
+    return "Não consegui concluir seu login. Tente novamente.";
+  }
+
+  if (
+    normalizedMessage.includes("unauthorized") ||
+    normalizedMessage.includes("jwt") ||
+    normalizedMessage.includes("token") ||
+    normalizedMessage.includes("401")
+  ) {
+    return "Sua sessão expirou. Entre novamente.";
+  }
+
+  if (normalizedMessage.includes("forbidden") || normalizedMessage.includes("403")) {
+    return "Você não tem permissão para fazer essa ação.";
+  }
+
+  if (
+    normalizedMessage.includes("email already exists") ||
+    normalizedMessage.includes("user already exists") ||
+    normalizedMessage.includes("already registered")
+  ) {
+    return "Esse email já está cadastrado. Tente entrar com ele.";
+  }
+
+  if (
+    normalizedMessage.includes("given id must not be null") ||
+    normalizedMessage.includes("usuario logado sem id") ||
+    normalizedMessage.includes("usuário logado sem id") ||
+    normalizedMessage.includes("user id must not be null")
+  ) {
+    return "Não consegui identificar sua conta. Saia e entre novamente.";
+  }
+
+  if (
+    normalizedMessage.includes("failed to convert") ||
+    normalizedMessage.includes("method parameter") ||
+    normalizedMessage.includes("for input string")
+  ) {
+    return "Recebi um identificador inválido. Atualize a página e tente de novo.";
+  }
+
+  if (normalizedMessage.includes("method not allowed") || normalizedMessage.includes("405")) {
+    return "Essa ação não está disponível nessa rota. Atualize a página e tente novamente.";
+  }
+
+  if (normalizedMessage.includes("group not found") || normalizedMessage.includes("grupo nao encontrado")) {
+    return "Grupo não encontrado. Volte para a lista e tente de novo.";
+  }
+
+  if (
+    normalizedMessage.includes("user not found") ||
+    normalizedMessage.includes("usuario nao encontrado") ||
+    normalizedMessage.includes("nenhum usuario encontrado")
+  ) {
+    return "Não encontrei uma conta com esse email.";
+  }
+
+  if (
+    normalizedMessage.includes("already in group") ||
+    normalizedMessage.includes("ja esta no grupo") ||
+    normalizedMessage.includes("já está no grupo")
+  ) {
+    return "Essa pessoa já faz parte desse grupo.";
+  }
+
+  if (normalizedMessage.includes("not found") || normalizedMessage.includes("404")) {
+    return "Não encontrei o que você tentou abrir. Atualize a página e tente de novo.";
+  }
+
+  if (normalizedMessage.includes("bad request") || normalizedMessage.includes("400")) {
+    return "Alguma informação ficou inválida. Confira os campos e tente de novo.";
+  }
+
+  if (normalizedMessage.includes("internal server error") || normalizedMessage.includes("500")) {
+    return "O servidor não conseguiu concluir essa ação agora. Tente novamente em instantes.";
+  }
+
+  if (
+    normalizedMessage.includes("constraint") ||
+    normalizedMessage.includes("database") ||
+    normalizedMessage.includes("sql")
+  ) {
+    return "Não foi possível salvar agora. Tente novamente.";
+  }
+
+  return rawMessage;
+}
+
 export async function apiFetch(path: string, options: RequestInit = {}) {
   const token = getToken();
   const headers = new Headers(options.headers);
@@ -149,10 +290,21 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(getApiUrl(path), {
-    ...options,
-    headers,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(getApiUrl(path), {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new Error(
+      getFriendlyErrorMessage(
+        error instanceof Error ? error.message : "",
+        "Não consegui conectar ao servidor do Movely. Tente novamente em instantes.",
+      ),
+    );
+  }
 
   if (response.status === 401) {
     clearToken();
@@ -161,11 +313,11 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   return response;
 }
 
-export async function readError(response: Response, fallback = "Nao foi possivel concluir agora.") {
+export async function readError(response: Response, fallback = "Não foi possível concluir agora.") {
   const text = await response.text();
 
   if (!text) {
-    return fallback;
+    return getFriendlyErrorMessage(response.statusText, fallback);
   }
 
   try {
@@ -175,9 +327,9 @@ export async function readError(response: Response, fallback = "Nao foi possivel
       error?: string;
     };
 
-    return data.message ?? data.mensagem ?? data.error ?? fallback;
+    return getFriendlyErrorMessage(data.message ?? data.mensagem ?? data.error ?? "", fallback);
   } catch {
-    return text;
+    return getFriendlyErrorMessage(text, fallback);
   }
 }
 
@@ -186,7 +338,7 @@ export async function apiJson<T>(path: string, options: RequestInit = {}) {
   const text = await response.text();
 
   if (!response.ok) {
-    throw new Error(text || response.statusText);
+    throw new Error(getFriendlyErrorMessage(text || response.statusText));
   }
 
   if (!text) {
@@ -231,7 +383,7 @@ export async function getCurrentUser() {
       };
     }
 
-    throw new Error("Usuario logado sem ID.");
+    throw new Error("Não consegui identificar sua conta. Saia e entre novamente.");
   }
 
   if (!user.id && storedUser?.id && sameUserIdentity(storedUser, user.username || user.email || "")) {
@@ -254,7 +406,7 @@ export async function getCurrentUser() {
   }
 
   if (!user.id) {
-    throw new Error("Usuario logado sem ID.");
+    throw new Error("Não consegui identificar sua conta. Saia e entre novamente.");
   }
 
   saveCurrentUser(user);

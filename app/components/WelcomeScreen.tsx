@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import movelyIcon from "../../images/movelyicon.png";
 
 const slides = [
   {
@@ -47,7 +48,7 @@ export function WelcomeScreen() {
       <section className="welcome-card" aria-label="Apresentação do Movely">
         <header className="welcome-top">
           <div className="brand-row compact">
-            <div className="brand-mark">M</div>
+            <img alt="" className="brand-mark brand-logo-image" src={movelyIcon} />
             <div>
               <p>Movely</p>
               <strong>movely</strong>

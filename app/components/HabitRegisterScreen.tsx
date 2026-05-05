@@ -1,8 +1,9 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "./bottomnav";
+import HabitIcon from "./HabitIcon";
 import MobileHeader from "./mobileheader";
-import { apiFetch, getCurrentUser, getStoredUser, getToken } from "../lib/api";
+import { apiFetch, getCurrentUser, getFriendlyErrorMessage, getStoredUser, getToken, readError } from "../lib/api";
 
 type HabitType = "water" | "steps" | "sleep" | "workout" | "study";
 type LoadStatus = "loading" | "ready" | "error";
@@ -39,7 +40,6 @@ const habits: Record<
     helper: string;
     endpoint: string;
     accent: string;
-    short: string;
   }
 > = {
   water: {
@@ -47,35 +47,30 @@ const habits: Record<
     helper: "Quantidade em ml",
     endpoint: "/api/registers/water",
     accent: "blue",
-    short: "Ag",
   },
   steps: {
     label: "Passos",
     helper: "Total de passos",
     endpoint: "/api/registers/steps",
     accent: "green",
-    short: "Ps",
   },
   workout: {
     label: "Treino",
     helper: "Tipo e duração",
     endpoint: "/api/registers/workout",
     accent: "orange",
-    short: "Tr",
   },
   sleep: {
     label: "Sono",
     helper: "Horas e qualidade",
     endpoint: "/api/registers/sleep",
     accent: "pink",
-    short: "So",
   },
   study: {
     label: "Estudo",
     helper: "Tempo estudado",
     endpoint: "/api/registers/study",
     accent: "purple",
-    short: "Es",
   },
 };
 
@@ -116,7 +111,7 @@ function getValidationMessage(
   values: FormValues,
 ) {
   if (groupIds.length === 0) {
-    return "Escolha pelo menos um grupo.";
+    return "Escolha um grupo.";
   }
 
   if (!Number(values.userId) || Number(values.userId) < 1) {
@@ -188,21 +183,6 @@ function buildPayload(habitType: HabitType, groupId: string, values: FormValues)
   return { ...payload, hours: Number(values.hours) };
 }
 
-async function readError(response: Response) {
-  const text = await response.text();
-
-  if (!text) {
-    return response.statusText || "Não foi possível salvar o registro.";
-  }
-
-  try {
-    const data = JSON.parse(text) as { mensagem?: string; message?: string };
-    return data.mensagem ?? data.message ?? text;
-  } catch {
-    return text;
-  }
-}
-
 export function HabitRegisterScreen() {
   const navigate = useNavigate();
   const [groups, setGroups] = useState<Group[]>([]);
@@ -226,12 +206,9 @@ export function HabitRegisterScreen() {
   const selectedGroupLabel =
     selectedGroupCount === 0
       ? "Nenhum grupo selecionado"
-      : selectedGroupCount === 1
-        ? selectedGroup?.name || "1 grupo selecionado"
-        : `${selectedGroupCount} grupos selecionados`;
+      : selectedGroup?.name || "1 grupo selecionado";
   const selectedGroupNames = selectedGroups.map((group) => group.name).join(", ");
-  const selectedTargetText =
-    selectedGroupCount === 1 ? "grupo selecionado" : "grupos selecionados";
+  const selectedTargetText = "grupo selecionado";
   const activeHabit = habits[habitType];
 
   useEffect(() => {
@@ -260,7 +237,7 @@ export function HabitRegisterScreen() {
           );
 
           if (validIds.length > 0) {
-            return validIds;
+            return [validIds[0]];
           }
 
           return groupList[0]?.id ? [groupList[0].id] : [];
@@ -271,8 +248,8 @@ export function HabitRegisterScreen() {
         setLoadStatus("error");
         setMessage(
           error instanceof Error
-            ? error.message
-            : "Nao foi possivel carregar seus dados.",
+            ? getFriendlyErrorMessage(error.message, "Não foi possível carregar seus dados.")
+            : "Não foi possível carregar seus dados.",
         );
       });
   }, [navigate]);
@@ -283,16 +260,14 @@ export function HabitRegisterScreen() {
 
   function toggleGroupSelection(groupId: string) {
     setSelectedGroupIds((current) =>
-      current.includes(groupId)
-        ? current.filter((id) => id !== groupId)
-        : [...current, groupId],
+      current.includes(groupId) ? [] : [groupId],
     );
   }
 
   function handleGoToRegister() {
     if (selectedGroupIds.length === 0) {
       setSubmitStatus("error");
-      setMessage("Escolha pelo menos um grupo para continuar.");
+      setMessage("Escolha um grupo para continuar.");
       return;
     }
 
@@ -341,11 +316,7 @@ export function HabitRegisterScreen() {
 
       saveStoredUserId(values.userId);
       setSubmitStatus("success");
-      setMessage(
-        selectedGroupCount === 1 && selectedGroup
-          ? `Registro salvo em ${selectedGroup.name}.`
-          : `Registro salvo em ${selectedGroupCount} grupos.`,
-      );
+      setMessage(selectedGroup ? `Registro salvo em ${selectedGroup.name}.` : "Registro salvo.");
       setValues((current) => ({
         ...emptyValues,
         userId: current.userId,
@@ -354,7 +325,7 @@ export function HabitRegisterScreen() {
       setSubmitStatus("error");
       setMessage(
         error instanceof Error
-          ? error.message
+          ? getFriendlyErrorMessage(error.message, "Não foi possível salvar o registro.")
           : "Não foi possível salvar o registro.",
       );
     }
@@ -375,16 +346,16 @@ export function HabitRegisterScreen() {
               Voltar
             </button>
           )}
-          <span>{step === "group" ? "Escolha dos grupos" : "Registro da meta"}</span>
+          <span>{step === "group" ? "Escolha do grupo" : "Registro da meta"}</span>
         </div>
 
         {step === "group" ? (
           <>
             <section className="habit-hero">
               <p>Registrar atividade</p>
-              <h1>Escolha os grupos</h1>
+              <h1>Escolha o grupo</h1>
               <span>
-                Selecione um ou mais grupos onde esse registro vai contar.
+                Selecione o grupo onde esse registro vai contar.
               </span>
             </section>
 
@@ -394,7 +365,7 @@ export function HabitRegisterScreen() {
                   <span className="habit-kicker">Seus grupos</span>
                   <strong>{selectedGroupLabel}</strong>
                 </div>
-                <p>Toque para marcar ou remover grupos.</p>
+                <p>Toque para escolher ou remover o grupo.</p>
               </div>
 
               {loadStatus === "loading" && (
@@ -445,7 +416,7 @@ export function HabitRegisterScreen() {
                       <em>
                         {selectedGroupIds.includes(group.id)
                           ? "Selecionado"
-                          : "Adicionar"}
+                          : "Escolher"}
                       </em>
                     </button>
                   ))}
@@ -533,7 +504,9 @@ export function HabitRegisterScreen() {
                         }}
                         type="button"
                       >
-                        <span>{habit.short}</span>
+                        <span>
+                          <HabitIcon type={type} />
+                        </span>
                         <strong>{habit.label}</strong>
                         <small>{habit.helper}</small>
                       </button>
@@ -548,7 +521,7 @@ export function HabitRegisterScreen() {
                     <span className="habit-kicker">Dados do registro</span>
                     <strong>{activeHabit.label}</strong>
                   </div>
-                  <p>Essas informações vão para os {selectedTargetText}.</p>
+                  <p>Essas informações vão para o {selectedTargetText}.</p>
                 </div>
 
                 <div className="field-row habit-primary-fields">

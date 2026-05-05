@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { apiFetch, apiJson, getCurrentUser, getToken, readError } from "../lib/api";
+import { apiFetch, apiJson, getCurrentUser, getFriendlyErrorMessage, getToken, readError } from "../lib/api";
 
 type RequestStatus = "idle" | "loading" | "submitting" | "success" | "error";
 
@@ -106,7 +106,7 @@ export function CreateGroupScreen() {
 
     if (!canSubmit) {
       setStatus("error");
-      setMessage("Preencha nome e descricao para criar o grupo.");
+      setMessage("Preencha nome e descrição para criar o grupo.");
       return;
     }
 
@@ -130,7 +130,7 @@ export function CreateGroupScreen() {
       }, 650);
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel criar o grupo.");
+      setMessage(getFriendlyErrorMessage(error instanceof Error ? error.message : "", "Não foi possível criar o grupo."));
     }
   }
 
@@ -232,7 +232,7 @@ export function AddMembersScreen() {
   async function loadData() {
     if (!id) {
       setStatus("error");
-      setMessage("Grupo nao encontrado.");
+      setMessage("Grupo não encontrado.");
       return;
     }
 
@@ -249,10 +249,10 @@ export function AddMembersScreen() {
       setCurrentUserId(currentUser?.id ?? null);
       setGroup(foundGroup);
       setStatus(foundGroup ? "idle" : "error");
-      setMessage(foundGroup ? "" : "Grupo nao encontrado.");
+      setMessage(foundGroup ? "" : "Grupo não encontrado.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel carregar o grupo.");
+      setMessage(getFriendlyErrorMessage(error instanceof Error ? error.message : "", "Não foi possível carregar o grupo."));
     }
   }
 
@@ -270,7 +270,7 @@ export function AddMembersScreen() {
 
     if (!id) {
       setStatus("error");
-      setMessage("Grupo nao encontrado.");
+      setMessage("Grupo não encontrado.");
       return;
     }
 
@@ -298,28 +298,28 @@ export function AddMembersScreen() {
       });
 
       if (!user) {
-        throw new Error("Nenhum usuario encontrado com esse email.");
+        throw new Error("Não encontrei uma conta com esse email.");
       }
 
       setFoundUser(user);
       setStatus("success");
-      setMessage("Usuario encontrado. Agora voce pode enviar o convite.");
+      setMessage("Usuário encontrado. Agora você pode enviar o convite.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Nenhum usuario encontrado com esse email.");
+      setMessage(getFriendlyErrorMessage(error instanceof Error ? error.message : "", "Não encontrei uma conta com esse email."));
     }
   }
 
   async function handleInviteUser() {
     if (!groupId || !foundUserEmail) {
       setStatus("error");
-      setMessage("Grupo ou usuario nao identificado.");
+      setMessage("Não consegui identificar o grupo ou a pessoa. Atualize e tente de novo.");
       return;
     }
 
     if (foundUserIsMember) {
       setStatus("error");
-      setMessage("Essa pessoa ja esta no grupo.");
+      setMessage("Essa pessoa já faz parte desse grupo.");
       return;
     }
 
@@ -340,7 +340,7 @@ export function AddMembersScreen() {
       );
 
       if (!response.ok) {
-        throw new Error(await readError(response, "Nao foi possivel enviar o convite."));
+        throw new Error(await readError(response, "Não foi possível enviar o convite."));
       }
 
       await response.json();
@@ -350,14 +350,14 @@ export function AddMembersScreen() {
       setMessage("Convite enviado. A pessoa precisa aceitar para entrar no grupo.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel enviar o convite.");
+      setMessage(getFriendlyErrorMessage(error instanceof Error ? error.message : "", "Não foi possível enviar o convite."));
     }
   }
 
   async function handleRemoveMember(userId: number) {
     if (!groupId) {
       setStatus("error");
-      setMessage("Grupo nao encontrado.");
+      setMessage("Grupo não encontrado.");
       return;
     }
 
@@ -374,7 +374,7 @@ export function AddMembersScreen() {
       });
 
       if (!response.ok) {
-        throw new Error(await readError(response, "Nao foi possivel remover o membro."));
+        throw new Error(await readError(response, "Não foi possível remover o membro."));
       }
 
       const updatedGroup = (await response.json()) as Group;
@@ -383,7 +383,7 @@ export function AddMembersScreen() {
       setMessage("Membro removido do grupo.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Nao foi possivel remover o membro.");
+      setMessage(getFriendlyErrorMessage(error instanceof Error ? error.message : "", "Não foi possível remover o membro."));
     }
   }
 

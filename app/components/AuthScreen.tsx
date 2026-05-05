@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { apiFetch, getCurrentUser } from "../lib/api";
+import { apiFetch, getCurrentUser, getFriendlyErrorMessage } from "../lib/api";
+import movelyIcon from "../../images/movelyicon.png";
 
 type AuthMode = "login" | "register";
 type RequestStatus = "idle" | "submitting" | "success" | "error";
@@ -33,30 +34,6 @@ const authCopy = {
     alternateHref: "/login",
   },
 } as const;
-
-function getFriendlyError(message: string) {
-  if (!message) {
-    return "Não foi possível concluir agora. Tente novamente.";
-  }
-
-  if (message.includes("Email already exists") || message.includes("User already exists")) {
-    return "Esse email ja existe. Tente entrar com ele.";
-  }
-
-  if (message.includes("User already exists")) {
-    return "Esse usuário já existe. Tente entrar ou escolha outro nome.";
-  }
-
-  if (message.includes("Bad credentials") || message.includes("Unauthorized")) {
-    return "Email ou senha invalidos.";
-  }
-
-  if (message.includes("Bad credentials") || message.includes("Unauthorized")) {
-    return "Usuário ou senha inválidos.";
-  }
-
-  return message;
-}
 
 function extractToken(responseText: string) {
   const trimmedText = responseText.trim();
@@ -170,7 +147,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     } catch (error) {
       setStatus("error");
       setMessage(
-        getFriendlyError(error instanceof Error ? error.message : ""),
+        getFriendlyErrorMessage(error instanceof Error ? error.message : ""),
       );
     }
   }
@@ -180,7 +157,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       <section className="auth-layout" aria-label="Autenticação Movely">
         <div className="auth-phone">
           <div className="brand-row">
-            <div className="brand-mark">M</div>
+            <img alt="" className="brand-mark brand-logo-image" src={movelyIcon} />
             <div>
               <p>{copy.eyebrow}</p>
               <strong>movely</strong>

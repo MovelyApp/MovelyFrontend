@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { apiFetch, clearToken, getCurrentUser, getStoredUser, getToken } from "../lib/api";
+import movelyIcon from "../../images/movelyicon.png";
 
 export default function MobileHeader() {
     const navigate = useNavigate();
@@ -41,9 +42,7 @@ export default function MobileHeader() {
             <div className="flex justify-between items-center">
 
                 <Link to="/dashboard" className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#3C3489] flex items-center justify-center">
-                        <div className="w-4 h-4 rounded-full border-2 border-[#AFA9EC]" />
-                    </div>
+                    <img alt="" className="w-8 h-8 rounded-xl object-cover shadow-sm" src={movelyIcon} />
                     <span className="text-base font-medium text-[#3C3489]">movely</span>
                 </Link>
 
