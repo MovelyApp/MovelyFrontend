@@ -10,3 +10,7 @@ MovelyBackend/
 
 # Local dev server logs
 dev-server*.log
+
+/dist/
+.idea/
+*.iml

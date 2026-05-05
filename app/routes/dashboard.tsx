@@ -25,22 +25,28 @@ export default function Dashboard() {
             return;
         }
 
-        Promise.all([
-            apiFetch("/me").then((r) => (r.ok ? r.text() : "")),
-            apiFetch("/api/goals").then((r) => {
-                if (!r.ok) throw new Error("Erro ao buscar metas");
-                return r.json();
-            }),
-        ])
-            .then(([name, goalsData]) => {
-                setUsername(name);
-                setGoals(goalsData);
-                setLoading(false);
-            })
-            .catch((err) => {
-                setError(err.message);
-                setLoading(false);
-            });
+        apiFetch("/me").then((response) => {
+            if (!response.status || response.status >= 400) {
+                throw new Error("Erro ao buscar informações do usuário");
+            }
+            return response.data;
+        }).then((data) => {
+            console.log("User data:", data);
+            setUsername(data.username);
+        }).catch((err) => {
+            setError(err.message);
+        });
+
+        apiFetch("/api/goals").then((response) => {
+            if (!response.status || response.status >= 400) {
+                throw new Error("Erro ao buscar metas");
+            }
+            setGoals(response.data || []);
+            setLoading(false);
+        }).catch((err) => {
+            setError(err.message);
+            setLoading(false);
+        });
     }, [navigate]);
 
     return (

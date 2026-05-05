@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { apiFetch } from "~/lib/api";
 
 type AuthMode = "login" | "register";
 type RequestStatus = "idle" | "submitting" | "success" | "error";
@@ -8,7 +9,6 @@ type AuthScreenProps = {
   mode: AuthMode;
 };
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 const authCopy = {
   login: {
@@ -48,7 +48,8 @@ function getFriendlyError(message: string) {
     return "Usuário ou senha inválidos.";
   }
 
-  return message;
+  console.error("Unexpected error:", message);
+  return "Não foi possível concluir agora. Tente novamente.";
 }
 
 export function AuthScreen({ mode }: AuthScreenProps) {
@@ -84,25 +85,24 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     setStatus("submitting");
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}${isRegister ? "/auth/register" : "/auth/login"}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: trimmedUsername,
-            password,
-          }),
-        },
-      );
+      const response = await apiFetch.post(isRegister ? "/auth/register" : "/auth/login", {
+        username: trimmedUsername,
+        password,
+      }).catch((error) => {
+        if (error.response) {
+          throw new Error(error.response.data?.message || "Erro desconhecido");
+        }
+        throw new Error("Erro de conexão com o servidor");
+      });
+    
 
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        throw new Error(responseText || response.statusText);
+      const responseText = response.data?.token || "";
+      
+      if (!response.status || response.status >= 400) {
+        throw new Error(responseText || "Erro desconhecido");
       }
+
+      
 
       if (!isRegister && typeof window !== "undefined") {
         if (remember) {

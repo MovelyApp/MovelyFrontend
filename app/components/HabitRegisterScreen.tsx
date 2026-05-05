@@ -1,3 +1,4 @@
+import axios from "axios";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "./bottomnav";
@@ -187,19 +188,29 @@ function buildPayload(habitType: HabitType, groupId: string, values: FormValues)
   return { ...payload, hours: Number(values.hours) };
 }
 
-async function readError(response: Response) {
-  const text = await response.text();
+function getErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as
+      | { mensagem?: string; message?: string }
+      | string
+      | undefined;
 
-  if (!text) {
-    return response.statusText || "Não foi possível salvar o registro.";
+    if (typeof data === "string" && data.trim()) {
+      return data;
+    }
+
+    if (data && typeof data === "object") {
+      return data.mensagem ?? data.message ?? fallback;
+    }
+
+    return error.message || fallback;
   }
 
-  try {
-    const data = JSON.parse(text) as { mensagem?: string; message?: string };
-    return data.mensagem ?? data.message ?? text;
-  } catch {
-    return text;
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
+
+  return fallback;
 }
 
 export function HabitRegisterScreen() {
@@ -239,14 +250,11 @@ export function HabitRegisterScreen() {
       return;
     }
 
-    apiFetch("/groups")
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readError(response));
-        }
-
-        const data = (await response.json()) as GroupsResponse | Group[];
-        return Array.isArray(data) ? data : data.content ?? [];
+    apiFetch
+      .get("/groups")
+      .then(({ data }) => {
+        const groupList = (Array.isArray(data) ? data : data.content ?? []) as Group[];
+        return groupList;
       })
       .then((groupList) => {
         setGroups(groupList);
@@ -265,11 +273,7 @@ export function HabitRegisterScreen() {
       })
       .catch((error) => {
         setLoadStatus("error");
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "Não foi possível carregar os grupos.",
-        );
+        setMessage(getErrorMessage(error, "Não foi possível carregar os grupos."));
       });
   }, [navigate]);
 
@@ -324,14 +328,19 @@ export function HabitRegisterScreen() {
     try {
       for (const groupId of selectedGroupIds) {
         const targetGroup = groups.find((group) => group.id === groupId);
-        const response = await apiFetch(activeHabit.endpoint, {
-          method: "POST",
-          body: JSON.stringify(buildPayload(habitType, groupId, values)),
-        });
-
-        if (!response.ok) {
+        try {
+          await apiFetch.post(
+            activeHabit.endpoint,
+            buildPayload(habitType, groupId, values),
+          );
+        } catch (error) {
           const groupName = targetGroup?.name || "Grupo";
-          throw new Error(`${groupName}: ${await readError(response)}`);
+          throw new Error(
+            `${groupName}: ${getErrorMessage(
+              error,
+              "Não foi possível salvar o registro.",
+            )}`,
+          );
         }
       }
 
@@ -348,11 +357,7 @@ export function HabitRegisterScreen() {
       }));
     } catch (error) {
       setSubmitStatus("error");
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível salvar o registro.",
-      );
+      setMessage(getErrorMessage(error, "Não foi possível salvar o registro."));
     }
   }
 
