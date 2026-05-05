@@ -27,6 +27,12 @@ type GroupsResponse = {
     content?: Group[];
 };
 
+type GroupInvite = {
+    id: number;
+    groupName: string;
+    invitedByEmail?: string;
+};
+
 const dailyTasks: Array<{
     key: HabitKey;
     label: string;
@@ -44,8 +50,10 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const [username, setUsername] = useState("Movely");
     const [groups, setGroups] = useState<Group[]>([]);
+    const [pendingInvites, setPendingInvites] = useState<GroupInvite[]>([]);
     const [registers, setRegisters] = useState<RegisterEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [actingInviteId, setActingInviteId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -61,7 +69,7 @@ export default function Dashboard() {
             .then(async (user) => {
                 setUsername(user.email || user.username || "Movely");
 
-                const [groupList, registerList] = await Promise.all([
+                const [groupList, registerList, inviteList] = await Promise.all([
                     apiFetch("/api/groups").then(async (response) => {
                         if (response.status === 401) {
                             navigate("/login");
@@ -87,10 +95,18 @@ export default function Dashboard() {
 
                         return response.json() as Promise<RegisterEntry[]>;
                     }),
+                    apiFetch("/api/groups/invites/mine").then(async (response) => {
+                        if (!response.ok) {
+                            return [];
+                        }
+
+                        return response.json() as Promise<GroupInvite[]>;
+                    }),
                 ]);
 
                 setGroups(groupList);
                 setRegisters(registerList);
+                setPendingInvites(inviteList);
                 setLoading(false);
             })
             .catch((err) => {
@@ -98,6 +114,35 @@ export default function Dashboard() {
                 setLoading(false);
             });
     }, [navigate]);
+
+    async function handleInviteAction(inviteId: number, action: "accept" | "decline") {
+        setActingInviteId(inviteId);
+        setError(null);
+
+        try {
+            const response = await apiFetch(`/api/groups/invites/${inviteId}/${action}`, {
+                method: "POST",
+            });
+
+            if (!response.ok) {
+                throw new Error(await readError(response, "Nao foi possivel responder o convite"));
+            }
+
+            setPendingInvites((current) => current.filter((invite) => invite.id !== inviteId));
+
+            if (action === "accept") {
+                const groupsResponse = await apiFetch("/api/groups");
+                if (groupsResponse.ok) {
+                    const data = (await groupsResponse.json()) as GroupsResponse | Group[];
+                    setGroups(Array.isArray(data) ? data : data.content ?? []);
+                }
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Nao foi possivel responder o convite");
+        } finally {
+            setActingInviteId(null);
+        }
+    }
 
     const completedToday = useMemo(() => {
         const completed = new Set<HabitKey>();
@@ -129,6 +174,53 @@ export default function Dashboard() {
                         {username || "Movely"}
                     </h1>
                 </section>
+
+                {!loading && pendingInvites.length > 0 && (
+                    <section className="mb-6">
+                        <div className="flex justify-between items-center mb-3">
+                            <h2 className="text-base font-medium text-[#1a1a1a]">
+                                Convites de grupo
+                            </h2>
+                            <span className="text-xs text-[#534AB7] font-medium">
+                                {pendingInvites.length}
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            {pendingInvites.map((invite) => (
+                                <article
+                                    className="bg-white border border-[#CECBF6] rounded-2xl p-4"
+                                    key={invite.id}
+                                >
+                                    <p className="text-sm font-medium text-[#1a1a1a]">
+                                        {invite.groupName}
+                                    </p>
+                                    <p className="text-xs text-[#888] mt-1">
+                                        Convite de {invite.invitedByEmail || "Movely"}
+                                    </p>
+                                    <div className="flex gap-2 mt-4">
+                                        <button
+                                            className="flex-1 h-10 rounded-xl bg-[#534AB7] text-white text-xs font-medium disabled:opacity-60"
+                                            disabled={actingInviteId === invite.id}
+                                            onClick={() => handleInviteAction(invite.id, "accept")}
+                                            type="button"
+                                        >
+                                            Aceitar
+                                        </button>
+                                        <button
+                                            className="flex-1 h-10 rounded-xl border border-[#CECBF6] text-[#534AB7] text-xs font-medium disabled:opacity-60"
+                                            disabled={actingInviteId === invite.id}
+                                            onClick={() => handleInviteAction(invite.id, "decline")}
+                                            type="button"
+                                        >
+                                            Recusar
+                                        </button>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 <section className="bg-[#3C3489] rounded-2xl p-6 mb-6 text-white">
                     <div className="flex justify-between items-baseline mb-3">

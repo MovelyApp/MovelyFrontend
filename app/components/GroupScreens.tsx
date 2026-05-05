@@ -287,7 +287,9 @@ export function AddMembersScreen() {
     setFoundUser(null);
 
     try {
-      const usersResponse = await apiJson<PageResponse<User> | User[]>("/api/users");
+      const usersResponse = await apiJson<PageResponse<User> | User[]>(
+        `/api/users?email=${encodeURIComponent(normalizedEmail)}`,
+      );
       const user = getPageItems(usersResponse).find((item) => {
         const itemEmail = (item.email || item.username || "").trim().toLowerCase();
         const itemUsername = (item.username || "").trim().toLowerCase();
