@@ -53,7 +53,7 @@ export default function Groups() {
       ]);
 
       if (!groupsResponse.ok) {
-        throw new Error(await readError(groupsResponse, "Erro ao buscar grupos"));
+        throw new Error(await readError(groupsResponse, "Não foi possível carregar seus grupos."));
       }
 
       const groupsData = (await groupsResponse.json()) as GroupsResponse | Group[];
@@ -65,7 +65,7 @@ export default function Groups() {
         setInvites([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao buscar grupos");
+      setError(err instanceof Error ? err.message : "Não foi possível carregar seus grupos.");
     } finally {
       setLoading(false);
     }
@@ -90,12 +90,12 @@ export default function Groups() {
       });
 
       if (!response.ok) {
-        throw new Error(await readError(response, "Nao foi possivel responder o convite"));
+        throw new Error(await readError(response, "Não foi possível responder o convite."));
       }
 
       await loadGroupsAndInvites();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nao foi possivel responder o convite");
+      setError(err instanceof Error ? err.message : "Não foi possível responder o convite.");
     } finally {
       setActingInviteId(null);
     }
@@ -194,9 +194,9 @@ export default function Groups() {
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
-              <p className="text-sm text-red-700">Erro: {error}</p>
+              <p className="text-sm text-red-700">{error}</p>
               <p className="text-xs text-red-600 mt-1">
-                Verifique se o backend está rodando.
+                Atualize a página e tente novamente.
               </p>
             </div>
           )}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "../components/bottomnav";
+import HabitIcon from "../components/HabitIcon";
 import MobileHeader from "../components/mobileheader";
 import { apiFetch, getCurrentUser, getToken, readError } from "../lib/api";
 
@@ -10,6 +11,8 @@ type RegisterEntry = {
     id: number;
     groupId?: string;
     dateTime?: string;
+    notes?: string;
+    description?: string;
     ml?: number;
     steps?: number;
     hours?: number;
@@ -37,13 +40,12 @@ const dailyTasks: Array<{
     key: HabitKey;
     label: string;
     helper: string;
-    short: string;
 }> = [
-    { key: "water", label: "Agua", helper: "Registrar consumo de agua", short: "Ag" },
-    { key: "steps", label: "Passos", helper: "Registrar passos do dia", short: "Ps" },
-    { key: "sleep", label: "Sono", helper: "Registrar sono e qualidade", short: "So" },
-    { key: "workout", label: "Treino", helper: "Registrar treino feito", short: "Tr" },
-    { key: "study", label: "Estudo", helper: "Registrar tempo estudado", short: "Es" },
+    { key: "water", label: "Agua", helper: "Registrar consumo de agua" },
+    { key: "steps", label: "Passos", helper: "Registrar passos do dia" },
+    { key: "sleep", label: "Sono", helper: "Registrar sono e qualidade" },
+    { key: "workout", label: "Treino", helper: "Registrar treino feito" },
+    { key: "study", label: "Estudo", helper: "Registrar tempo estudado" },
 ];
 
 export default function Dashboard() {
@@ -52,6 +54,7 @@ export default function Dashboard() {
     const [groups, setGroups] = useState<Group[]>([]);
     const [pendingInvites, setPendingInvites] = useState<GroupInvite[]>([]);
     const [registers, setRegisters] = useState<RegisterEntry[]>([]);
+    const [selectedHabit, setSelectedHabit] = useState<HabitKey | null>(null);
     const [loading, setLoading] = useState(true);
     const [actingInviteId, setActingInviteId] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -73,11 +76,11 @@ export default function Dashboard() {
                     apiFetch("/api/groups").then(async (response) => {
                         if (response.status === 401) {
                             navigate("/login");
-                            throw new Error("Sessao expirada. Entre novamente.");
+                            throw new Error("Sua sessão expirou. Entre novamente.");
                         }
 
                         if (!response.ok) {
-                            throw new Error(await readError(response, "Erro ao buscar grupos"));
+                            throw new Error(await readError(response, "Não foi possível carregar seus grupos."));
                         }
 
                         const data = (await response.json()) as GroupsResponse | Group[];
@@ -86,11 +89,11 @@ export default function Dashboard() {
                     apiFetch(`/api/registers/user/${user.id}`).then(async (response) => {
                         if (response.status === 401) {
                             navigate("/login");
-                            throw new Error("Sessao expirada. Entre novamente.");
+                            throw new Error("Sua sessão expirou. Entre novamente.");
                         }
 
                         if (!response.ok) {
-                            throw new Error(await readError(response, "Erro ao buscar registros"));
+                            throw new Error(await readError(response, "Não foi possível carregar seus registros."));
                         }
 
                         return response.json() as Promise<RegisterEntry[]>;
@@ -110,7 +113,7 @@ export default function Dashboard() {
                 setLoading(false);
             })
             .catch((err) => {
-                setError(err instanceof Error ? err.message : "Erro ao carregar inicio");
+                setError(err instanceof Error ? err.message : "Não foi possível carregar o início.");
                 setLoading(false);
             });
     }, [navigate]);
@@ -125,7 +128,7 @@ export default function Dashboard() {
             });
 
             if (!response.ok) {
-                throw new Error(await readError(response, "Nao foi possivel responder o convite"));
+                throw new Error(await readError(response, "Não foi possível responder o convite."));
             }
 
             setPendingInvites((current) => current.filter((invite) => invite.id !== inviteId));
@@ -138,16 +141,18 @@ export default function Dashboard() {
                 }
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Nao foi possivel responder o convite");
+            setError(err instanceof Error ? err.message : "Não foi possível responder o convite.");
         } finally {
             setActingInviteId(null);
         }
     }
 
+    const uniqueRegisters = useMemo(() => dedupeRegistersByActivity(registers), [registers]);
+
     const completedToday = useMemo(() => {
         const completed = new Set<HabitKey>();
 
-        registers.filter(isTodayRegister).forEach((register) => {
+        uniqueRegisters.filter(isTodayRegister).forEach((register) => {
             const habit = getHabitFromRegister(register);
             if (habit) {
                 completed.add(habit);
@@ -155,8 +160,31 @@ export default function Dashboard() {
         });
 
         return completed;
-    }, [registers]);
+    }, [uniqueRegisters]);
 
+    const todayRegistersByHabit = useMemo(() => {
+        return uniqueRegisters.filter(isTodayRegister).reduce<Record<HabitKey, RegisterEntry[]>>(
+            (acc, register) => {
+                const habit = getHabitFromRegister(register);
+
+                if (habit) {
+                    acc[habit].push(register);
+                }
+
+                return acc;
+            },
+            {
+                water: [],
+                steps: [],
+                sleep: [],
+                workout: [],
+                study: [],
+            },
+        );
+    }, [uniqueRegisters]);
+
+    const selectedTask = dailyTasks.find((task) => task.key === selectedHabit) ?? null;
+    const selectedHabitRegisters = selectedHabit ? todayRegistersByHabit[selectedHabit] : [];
     const completedCount = completedToday.size;
     const totalTasks = dailyTasks.length;
     const progress = Math.round((completedCount / totalTasks) * 100);
@@ -277,9 +305,9 @@ export default function Dashboard() {
 
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
-                            <p className="text-sm text-red-700">Erro: {error}</p>
+                            <p className="text-sm text-red-700">{error}</p>
                             <p className="text-xs text-red-600 mt-1">
-                                Verifique seu login e tente entrar de novo.
+                                Atualize a página ou entre novamente.
                             </p>
                         </div>
                     )}
@@ -303,16 +331,27 @@ export default function Dashboard() {
                             {dailyTasks.map((task) => (
                                 <GoalCard
                                     completed={completedToday.has(task.key)}
+                                    count={todayRegistersByHabit[task.key].length}
                                     helper={task.helper}
                                     key={task.key}
                                     label={task.label}
-                                    short={task.short}
+                                    habit={task.key}
+                                    onClick={() => setSelectedHabit(task.key)}
                                 />
                             ))}
                         </div>
                     )}
                 </section>
             </main>
+
+            {selectedTask && (
+                <HabitDetailsSheet
+                    groups={groups}
+                    onClose={() => setSelectedHabit(null)}
+                    registers={selectedHabitRegisters}
+                    title={selectedTask.label}
+                />
+            )}
 
             <BottomNav />
         </div>
@@ -321,29 +360,39 @@ export default function Dashboard() {
 
 function GoalCard({
     completed,
+    count,
+    habit,
     helper,
     label,
-    short,
+    onClick,
 }: {
     completed: boolean;
+    count: number;
+    habit: HabitKey;
     helper: string;
     label: string;
-    short: string;
+    onClick: () => void;
 }) {
     return (
-        <div className="bg-white border border-[#EEEDFE] rounded-2xl p-4 flex items-center gap-3">
+        <button
+            className="w-full text-left bg-white border border-[#EEEDFE] rounded-2xl p-4 flex items-center gap-3"
+            onClick={onClick}
+            type="button"
+        >
             <div
                 className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0"
                 style={{ backgroundColor: completed ? "#CECBF6" : "#EEEDFE", color: "#534AB7" }}
             >
-                {short}
+                <HabitIcon type={habit} />
             </div>
 
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[#1a1a1a] truncate">
                     {label}
                 </p>
-                <p className="text-xs text-[#888] truncate">{completed ? "Concluida hoje" : helper}</p>
+                <p className="text-xs text-[#888] truncate">
+                    {completed ? `${count} registro${count === 1 ? "" : "s"} hoje` : helper}
+                </p>
                 <div className="h-1 bg-[#F1EFE8] rounded-full overflow-hidden mt-2">
                     <div
                         className="h-full rounded-full bg-[#534AB7]"
@@ -353,8 +402,71 @@ function GoalCard({
             </div>
 
             <p className="text-sm font-medium flex-shrink-0 text-[#534AB7]">
-                {completed ? "100%" : "0%"}
+                {completed ? "Ver" : "0%"}
             </p>
+        </button>
+    );
+}
+
+function HabitDetailsSheet({
+    groups,
+    onClose,
+    registers,
+    title,
+}: {
+    groups: Group[];
+    onClose: () => void;
+    registers: RegisterEntry[];
+    title: string;
+}) {
+    return (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end px-4 pb-24">
+            <section className="w-full max-w-md mx-auto bg-white rounded-2xl p-5 max-h-[75vh] overflow-y-auto">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <p className="text-xs font-medium text-[#534AB7] mb-1">Detalhes de hoje</p>
+                        <h2 className="text-xl font-medium text-[#1a1a1a]">{title}</h2>
+                    </div>
+                    <button
+                        className="w-9 h-9 rounded-full bg-[#EEEDFE] text-[#534AB7] text-sm font-medium"
+                        onClick={onClose}
+                        type="button"
+                    >
+                        x
+                    </button>
+                </div>
+
+                {registers.length === 0 && (
+                    <div className="bg-[#FAFAF8] border border-[#EEEDFE] rounded-2xl p-5 text-center">
+                        <p className="text-sm text-[#888]">Nada registrado nessa meta hoje.</p>
+                    </div>
+                )}
+
+                {registers.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                        {registers.map((register) => (
+                            <article className="bg-[#FAFAF8] border border-[#EEEDFE] rounded-2xl p-4" key={register.id}>
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                    <p className="text-sm font-medium text-[#1a1a1a]">
+                                        {getRegisterValue(register)}
+                                    </p>
+                                    <span className="text-xs text-[#534AB7] font-medium">
+                                        {formatRegisterTime(register.dateTime)}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-[#888]">
+                                    {getGroupName(groups, register.groupId)}
+                                </p>
+                                {getRegisterNotes(register) && (
+                                    <p className="text-sm text-[#3C3489] mt-3">
+                                        {getRegisterNotes(register)}
+                                    </p>
+                                )}
+                            </article>
+                        ))}
+                    </div>
+                )}
+            </section>
         </div>
     );
 }
@@ -396,4 +508,105 @@ function getHabitFromRegister(register: RegisterEntry): HabitKey | null {
     }
 
     return null;
+}
+
+function dedupeRegistersByActivity(registers: RegisterEntry[]) {
+    const seen = new Set<string>();
+
+    return registers.filter((register) => {
+        const key = getRegisterFingerprint(register);
+
+        if (seen.has(key)) {
+            return false;
+        }
+
+        seen.add(key);
+        return true;
+    });
+}
+
+function getRegisterFingerprint(register: RegisterEntry) {
+    const minute = getRegisterMinute(register.dateTime);
+    const habit = getHabitFromRegister(register) ?? "register";
+    const notes = getRegisterNotes(register).trim().toLowerCase();
+
+    if (typeof register.ml === "number") {
+        return `${minute}|${habit}|ml:${register.ml}|${notes}`;
+    }
+
+    if (typeof register.steps === "number") {
+        return `${minute}|${habit}|steps:${register.steps}|${notes}`;
+    }
+
+    if (register.workoutType || typeof register.durationMin === "number") {
+        return `${minute}|${habit}|workout:${register.workoutType ?? ""}|duration:${register.durationMin ?? ""}|${notes}`;
+    }
+
+    if (typeof register.quality === "number") {
+        return `${minute}|${habit}|hours:${register.hours ?? ""}|quality:${register.quality}|${notes}`;
+    }
+
+    if (typeof register.hours === "number") {
+        return `${minute}|${habit}|hours:${register.hours}|${notes}`;
+    }
+
+    return `id:${register.id}`;
+}
+
+function getRegisterMinute(dateTime?: string) {
+    if (!dateTime) {
+        return "sem-data";
+    }
+
+    const date = new Date(dateTime);
+
+    if (Number.isNaN(date.getTime())) {
+        return dateTime;
+    }
+
+    return date.toISOString().slice(0, 16);
+}
+
+function getRegisterValue(register: RegisterEntry) {
+    if (typeof register.ml === "number") {
+        return `${register.ml} ml de agua`;
+    }
+
+    if (typeof register.steps === "number") {
+        return `${register.steps} passos`;
+    }
+
+    if (register.workoutType || typeof register.durationMin === "number") {
+        const duration = typeof register.durationMin === "number" ? `${register.durationMin} min` : "Treino";
+        return register.workoutType ? `${register.workoutType} - ${duration}` : duration;
+    }
+
+    if (typeof register.quality === "number") {
+        return `${register.hours ?? 0} h de sono - qualidade ${register.quality}/5`;
+    }
+
+    if (typeof register.hours === "number") {
+        return `${register.hours} h de estudo`;
+    }
+
+    return "Registro";
+}
+
+function getRegisterNotes(register: RegisterEntry) {
+    return register.notes || register.description || "";
+}
+
+function formatRegisterTime(dateTime?: string) {
+    if (!dateTime) {
+        return "--:--";
+    }
+
+    return new Date(dateTime).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function getGroupName(groups: Group[], groupId?: string) {
+    return groups.find((group) => group.id === groupId)?.name || "Grupo Movely";
 }

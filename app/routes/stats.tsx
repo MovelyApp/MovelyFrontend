@@ -18,6 +18,8 @@ type RegisterEntry = {
   userId?: number;
   user?: User;
   dateTime?: string;
+  notes?: string;
+  description?: string;
   ml?: number;
   steps?: number;
   hours?: number;
@@ -60,6 +62,7 @@ export default function Stats() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [registersByGroup, setRegistersByGroup] = useState<Record<string, RegisterEntry[]>>({});
   const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [selectedRegister, setSelectedRegister] = useState<RegisterEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +78,7 @@ export default function Stats() {
     apiFetch("/api/groups?size=100")
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error(await readError(response, "Erro ao buscar grupos"));
+          throw new Error(await readError(response, "Não foi possível carregar seus grupos."));
         }
 
         const data = (await response.json()) as GroupsResponse | Group[];
@@ -86,7 +89,7 @@ export default function Stats() {
             const registersResponse = await apiFetch(`/api/registers/group/${group.id}`);
 
             if (!registersResponse.ok) {
-              throw new Error(await readError(registersResponse, "Erro ao buscar registros do grupo"));
+              throw new Error(await readError(registersResponse, "Não foi possível carregar os registros do grupo."));
             }
 
             const registers = (await registersResponse.json()) as RegisterEntry[];
@@ -100,7 +103,7 @@ export default function Stats() {
         setLoading(false);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "Erro ao buscar dados");
+        setError(err instanceof Error ? err.message : "Não foi possível carregar as estatísticas.");
         setLoading(false);
       });
   }, [navigate]);
@@ -111,16 +114,27 @@ export default function Stats() {
   );
 
   const selectedRegisters = selectedGroup ? registersByGroup[selectedGroup.id] ?? [] : [];
-
-  const ranking = useMemo(
-    () => buildRanking(selectedGroup, selectedRegisters),
-    [selectedGroup, selectedRegisters],
+  const uniqueSelectedRegisters = useMemo(
+    () => dedupeRegistersByActivity(selectedRegisters),
+    [selectedRegisters],
   );
 
-  const timeline = useMemo(() => buildTimeline(selectedRegisters), [selectedRegisters]);
+  const ranking = useMemo(
+    () => buildRanking(selectedGroup, uniqueSelectedRegisters),
+    [selectedGroup, uniqueSelectedRegisters],
+  );
+
+  const timeline = useMemo(() => buildTimeline(uniqueSelectedRegisters), [uniqueSelectedRegisters]);
   const leader = ranking[0] ?? null;
   const todayGroupPoints = ranking.reduce((sum, row) => sum + row.todayPoints, 0);
   const totalGroupPoints = ranking.reduce((sum, row) => sum + row.totalPoints, 0);
+  const recentRegisters = useMemo(
+    () =>
+      [...uniqueSelectedRegisters]
+        .sort((a, b) => new Date(b.dateTime ?? 0).getTime() - new Date(a.dateTime ?? 0).getTime())
+        .slice(0, 10),
+    [uniqueSelectedRegisters],
+  );
   const maxTodayPoints = Math.max(...ranking.map((row) => row.todayPoints), 1);
   const maxTotalPoints = Math.max(...ranking.map((row) => row.totalPoints), 1);
   const maxTimelinePoints = Math.max(...timeline.map((day) => day.points), 1);
@@ -137,9 +151,9 @@ export default function Stats() {
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6">
-            <p className="text-sm text-red-700">Erro: {error}</p>
+            <p className="text-sm text-red-700">{error}</p>
             <p className="text-xs text-red-600 mt-1">
-              Verifique seu login e tente novamente.
+              Atualize a página ou entre novamente.
             </p>
           </div>
         )}
@@ -277,9 +291,67 @@ export default function Stats() {
                 </div>
               )}
             </section>
+
+            <section className="mt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-base font-medium text-[#1a1a1a]">
+                  Registros recentes
+                </h2>
+                <span className="text-xs text-[#534AB7] font-medium">
+                  {recentRegisters.length}
+                </span>
+              </div>
+
+              {recentRegisters.length === 0 && (
+                <div className="bg-white border border-[#EEEDFE] rounded-2xl p-8 text-center">
+                  <p className="text-sm text-[#888]">
+                    Nenhum registro nesse grupo ainda.
+                  </p>
+                </div>
+              )}
+
+              {recentRegisters.length > 0 && (
+                <div className="flex flex-col gap-3">
+                  {recentRegisters.map((register) => (
+                    <button
+                      className="w-full text-left bg-white border border-[#EEEDFE] rounded-2xl p-4"
+                      key={register.id}
+                      onClick={() => setSelectedRegister(register)}
+                      type="button"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[#1a1a1a] truncate">
+                            {getRegisterLabel(register)} - {getRegisterValue(register)}
+                          </p>
+                          <p className="text-xs text-[#888] truncate">
+                            {getDisplayName(register.user ?? { id: 0, username: "Movely" })}
+                          </p>
+                        </div>
+                        <span className="text-xs text-[#534AB7] font-medium flex-shrink-0">
+                          {formatRegisterDate(register.dateTime)}
+                        </span>
+                      </div>
+                      {getRegisterNotes(register) && (
+                        <p className="text-xs text-[#888] mt-3 line-clamp-2">
+                          {getRegisterNotes(register)}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
       </main>
+
+      {selectedRegister && (
+        <RegisterDetailsSheet
+          onClose={() => setSelectedRegister(null)}
+          register={selectedRegister}
+        />
+      )}
 
       <BottomNav />
     </div>
@@ -368,6 +440,60 @@ function ScoreBar({
   );
 }
 
+function RegisterDetailsSheet({
+  onClose,
+  register,
+}: {
+  onClose: () => void;
+  register: RegisterEntry;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end px-4 pb-24">
+      <section className="w-full max-w-md mx-auto bg-white rounded-2xl p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <p className="text-xs font-medium text-[#534AB7] mb-1">
+              {getRegisterLabel(register)}
+            </p>
+            <h2 className="text-xl font-medium text-[#1a1a1a]">
+              {getRegisterValue(register)}
+            </h2>
+          </div>
+          <button
+            className="w-9 h-9 rounded-full bg-[#EEEDFE] text-[#534AB7] text-sm font-medium"
+            onClick={onClose}
+            type="button"
+          >
+            x
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="bg-[#FAFAF8] border border-[#EEEDFE] rounded-2xl p-3">
+            <p className="text-xs text-[#888] mb-1">Pessoa</p>
+            <p className="text-sm font-medium text-[#1a1a1a] truncate">
+              {getDisplayName(register.user ?? { id: 0, username: "Movely" })}
+            </p>
+          </div>
+          <div className="bg-[#FAFAF8] border border-[#EEEDFE] rounded-2xl p-3">
+            <p className="text-xs text-[#888] mb-1">Quando</p>
+            <p className="text-sm font-medium text-[#1a1a1a]">
+              {formatRegisterDate(register.dateTime)}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-[#EEEDFE] rounded-2xl p-4">
+          <p className="text-xs font-medium text-[#534AB7] mb-2">Observacao</p>
+          <p className="text-sm text-[#3C3489]">
+            {getRegisterNotes(register) || "Sem observacao nesse registro."}
+          </p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function buildRanking(group: Group | null, registers: RegisterEntry[]) {
   const users = new Map<number, User>();
 
@@ -434,6 +560,128 @@ function getRegisterUserId(register: RegisterEntry) {
 
 function getDisplayName(user: User) {
   return user.email || user.username || "Movely";
+}
+
+function dedupeRegistersByActivity(registers: RegisterEntry[]) {
+  const seen = new Set<string>();
+
+  return registers.filter((register) => {
+    const key = getRegisterFingerprint(register);
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function getRegisterFingerprint(register: RegisterEntry) {
+  const minute = getRegisterMinute(register.dateTime);
+  const userId = getRegisterUserId(register);
+  const label = getRegisterLabel(register);
+  const notes = getRegisterNotes(register).trim().toLowerCase();
+
+  if (typeof register.ml === "number") {
+    return `${minute}|user:${userId}|${label}|ml:${register.ml}|${notes}`;
+  }
+
+  if (typeof register.steps === "number") {
+    return `${minute}|user:${userId}|${label}|steps:${register.steps}|${notes}`;
+  }
+
+  if (register.workoutType || typeof register.durationMin === "number") {
+    return `${minute}|user:${userId}|${label}|workout:${register.workoutType ?? ""}|duration:${register.durationMin ?? ""}|${notes}`;
+  }
+
+  if (typeof register.quality === "number") {
+    return `${minute}|user:${userId}|${label}|hours:${register.hours ?? ""}|quality:${register.quality}|${notes}`;
+  }
+
+  if (typeof register.hours === "number") {
+    return `${minute}|user:${userId}|${label}|hours:${register.hours}|${notes}`;
+  }
+
+  return `id:${register.id}`;
+}
+
+function getRegisterMinute(dateTime?: string) {
+  if (!dateTime) {
+    return "sem-data";
+  }
+
+  const date = new Date(dateTime);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateTime;
+  }
+
+  return date.toISOString().slice(0, 16);
+}
+
+function getRegisterLabel(register: RegisterEntry) {
+  if (typeof register.ml === "number") {
+    return "Agua";
+  }
+
+  if (typeof register.steps === "number") {
+    return "Passos";
+  }
+
+  if (register.workoutType || typeof register.durationMin === "number") {
+    return "Treino";
+  }
+
+  if (typeof register.quality === "number") {
+    return "Sono";
+  }
+
+  if (typeof register.hours === "number") {
+    return "Estudo";
+  }
+
+  return "Registro";
+}
+
+function getRegisterValue(register: RegisterEntry) {
+  if (typeof register.ml === "number") {
+    return `${register.ml} ml`;
+  }
+
+  if (typeof register.steps === "number") {
+    return `${register.steps} passos`;
+  }
+
+  if (register.workoutType || typeof register.durationMin === "number") {
+    const duration = typeof register.durationMin === "number" ? `${register.durationMin} min` : "Treino";
+    return register.workoutType ? `${register.workoutType} - ${duration}` : duration;
+  }
+
+  if (typeof register.quality === "number") {
+    return `${register.hours ?? 0} h - qualidade ${register.quality}/5`;
+  }
+
+  if (typeof register.hours === "number") {
+    return `${register.hours} h`;
+  }
+
+  return "Detalhes";
+}
+
+function getRegisterNotes(register: RegisterEntry) {
+  return register.notes || register.description || "";
+}
+
+function formatRegisterDate(dateTime?: string) {
+  if (!dateTime) {
+    return "--/--";
+  }
+
+  return new Date(dateTime).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
 function isTodayRegister(register: RegisterEntry) {
