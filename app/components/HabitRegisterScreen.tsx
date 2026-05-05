@@ -1,10 +1,13 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import BottomNav from "./bottomnav";
+import MobileHeader from "./mobileheader";
 import { apiFetch, getToken } from "../lib/api";
 
 type HabitType = "water" | "steps" | "sleep" | "workout" | "study";
 type LoadStatus = "loading" | "ready" | "error";
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
+type FlowStep = "group" | "register";
 
 type Group = {
   id: string;
@@ -102,13 +105,17 @@ function saveStoredUserId(userId: string) {
   }
 }
 
+function getGroupInitial(group?: Group) {
+  return group?.name.trim().charAt(0).toUpperCase() || "M";
+}
+
 function getValidationMessage(
   habitType: HabitType,
-  groupId: string,
+  groupIds: string[],
   values: FormValues,
 ) {
-  if (!groupId) {
-    return "Escolha um grupo.";
+  if (groupIds.length === 0) {
+    return "Escolha pelo menos um grupo.";
   }
 
   if (!Number(values.userId) || Number(values.userId) < 1) {
@@ -198,7 +205,8 @@ async function readError(response: Response) {
 export function HabitRegisterScreen() {
   const navigate = useNavigate();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [step, setStep] = useState<FlowStep>("group");
   const [habitType, setHabitType] = useState<HabitType>("water");
   const [values, setValues] = useState<FormValues>({
     ...emptyValues,
@@ -208,10 +216,21 @@ export function HabitRegisterScreen() {
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [message, setMessage] = useState("");
 
-  const selectedGroup = useMemo(
-    () => groups.find((group) => group.id === selectedGroupId),
-    [groups, selectedGroupId],
+  const selectedGroups = useMemo(
+    () => groups.filter((group) => selectedGroupIds.includes(group.id)),
+    [groups, selectedGroupIds],
   );
+  const selectedGroup = selectedGroups[0];
+  const selectedGroupCount = selectedGroupIds.length;
+  const selectedGroupLabel =
+    selectedGroupCount === 0
+      ? "Nenhum grupo selecionado"
+      : selectedGroupCount === 1
+        ? selectedGroup?.name || "1 grupo selecionado"
+        : `${selectedGroupCount} grupos selecionados`;
+  const selectedGroupNames = selectedGroups.map((group) => group.name).join(", ");
+  const selectedTargetText =
+    selectedGroupCount === 1 ? "grupo selecionado" : "grupos selecionados";
   const activeHabit = habits[habitType];
 
   useEffect(() => {
@@ -231,7 +250,17 @@ export function HabitRegisterScreen() {
       })
       .then((groupList) => {
         setGroups(groupList);
-        setSelectedGroupId((current) => current || groupList[0]?.id || "");
+        setSelectedGroupIds((current) => {
+          const validIds = current.filter((id) =>
+            groupList.some((group) => group.id === id),
+          );
+
+          if (validIds.length > 0) {
+            return validIds;
+          }
+
+          return groupList[0]?.id ? [groupList[0].id] : [];
+        });
         setLoadStatus("ready");
       })
       .catch((error) => {
@@ -248,13 +277,39 @@ export function HabitRegisterScreen() {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
+  function toggleGroupSelection(groupId: string) {
+    setSelectedGroupIds((current) =>
+      current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId],
+    );
+  }
+
+  function handleGoToRegister() {
+    if (selectedGroupIds.length === 0) {
+      setSubmitStatus("error");
+      setMessage("Escolha pelo menos um grupo para continuar.");
+      return;
+    }
+
+    setSubmitStatus("idle");
+    setMessage("");
+    setStep("register");
+  }
+
+  function handleBackToGroups() {
+    setSubmitStatus("idle");
+    setMessage("");
+    setStep("group");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
 
     const validationMessage = getValidationMessage(
       habitType,
-      selectedGroupId,
+      selectedGroupIds,
       values,
     );
 
@@ -267,21 +322,25 @@ export function HabitRegisterScreen() {
     setSubmitStatus("submitting");
 
     try {
-      const response = await apiFetch(activeHabit.endpoint, {
-        method: "POST",
-        body: JSON.stringify(buildPayload(habitType, selectedGroupId, values)),
-      });
+      for (const groupId of selectedGroupIds) {
+        const targetGroup = groups.find((group) => group.id === groupId);
+        const response = await apiFetch(activeHabit.endpoint, {
+          method: "POST",
+          body: JSON.stringify(buildPayload(habitType, groupId, values)),
+        });
 
-      if (!response.ok) {
-        throw new Error(await readError(response));
+        if (!response.ok) {
+          const groupName = targetGroup?.name || "Grupo";
+          throw new Error(`${groupName}: ${await readError(response)}`);
+        }
       }
 
       saveStoredUserId(values.userId);
       setSubmitStatus("success");
       setMessage(
-        selectedGroup
+        selectedGroupCount === 1 && selectedGroup
           ? `Registro salvo em ${selectedGroup.name}.`
-          : "Registro salvo.",
+          : `Registro salvo em ${selectedGroupCount} grupos.`,
       );
       setValues((current) => ({
         ...emptyValues,
@@ -298,254 +357,347 @@ export function HabitRegisterScreen() {
   }
 
   return (
-    <main className="habit-page">
-      <section className="habit-shell" aria-label="Registrar hábito">
-        <header className="habit-header">
-          <Link className="habit-back" to="/dashboard">
-            Voltar
-          </Link>
-          <div>
-            <p>Movely</p>
-            <h1>Registrar hábito</h1>
-          </div>
-        </header>
+    <div className="habit-page">
+      <MobileHeader />
 
-        <form className="habit-form" onSubmit={handleSubmit}>
-          <section className="habit-section">
-            <div className="section-title">
-              <span>1</span>
-              <div>
-                <h2>Grupo</h2>
-                <p>{selectedGroup?.description || "Escolha onde registrar"}</p>
+      <main className="habit-shell" aria-label="Registrar hábito">
+        <div className="habit-topbar">
+          {step === "group" ? (
+            <Link className="habit-back" to="/dashboard">
+              Voltar
+            </Link>
+          ) : (
+            <button className="habit-back" onClick={handleBackToGroups} type="button">
+              Voltar
+            </button>
+          )}
+          <span>{step === "group" ? "Escolha dos grupos" : "Registro da meta"}</span>
+        </div>
+
+        {step === "group" ? (
+          <>
+            <section className="habit-hero">
+              <p>Registrar atividade</p>
+              <h1>Escolha os grupos</h1>
+              <span>
+                Selecione um ou mais grupos onde esse registro vai contar.
+              </span>
+            </section>
+
+            <section className="habit-panel habit-step-panel">
+              <div className="habit-panel-heading">
+                <div>
+                  <span className="habit-kicker">Seus grupos</span>
+                  <strong>{selectedGroupLabel}</strong>
+                </div>
+                <p>Toque para marcar ou remover grupos.</p>
               </div>
-            </div>
 
-            {loadStatus === "loading" && (
-              <div className="habit-loading">
-                <span />
-                <span />
-              </div>
-            )}
+              {loadStatus === "loading" && (
+                <div className="habit-loading group-loading" aria-label="Carregando grupos">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
 
-            {loadStatus === "error" && (
+              {loadStatus === "error" && (
+                <p className="form-message error" role="status">
+                  {message}
+                </p>
+              )}
+
+              {loadStatus === "ready" && groups.length === 0 && (
+                <div className="empty-state">
+                  <strong>Nenhum grupo encontrado</strong>
+                  <p>Entre em um grupo antes de registrar metas.</p>
+                </div>
+              )}
+
+              {groups.length > 0 && (
+                <div className="habit-group-list">
+                  {groups.map((group) => (
+                    <button
+                      className={`habit-group-card ${
+                        selectedGroupIds.includes(group.id) ? "active" : ""
+                      }`}
+                      key={group.id}
+                      onClick={() => {
+                        toggleGroupSelection(group.id);
+                        setSubmitStatus("idle");
+                        setMessage("");
+                      }}
+                      type="button"
+                    >
+                      {group.urlImagem ? (
+                        <img alt="" className="habit-group-avatar" src={group.urlImagem} />
+                      ) : (
+                        <span className="habit-group-avatar">{getGroupInitial(group)}</span>
+                      )}
+                      <span className="habit-group-copy">
+                        <strong>{group.name}</strong>
+                        <small>{group.description || "Grupo Movely"}</small>
+                      </span>
+                      <em>
+                        {selectedGroupIds.includes(group.id)
+                          ? "Selecionado"
+                          : "Adicionar"}
+                      </em>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {message && submitStatus === "error" && (
               <p className="form-message error" role="status">
                 {message}
               </p>
             )}
 
-            {loadStatus === "ready" && groups.length === 0 && (
-              <div className="empty-state">
-                <strong>Nenhum grupo encontrado</strong>
-                <p>Crie ou entre em um grupo antes de registrar hábitos.</p>
+            <button
+              className="primary-button habit-submit"
+              disabled={
+                loadStatus !== "ready" ||
+                groups.length === 0 ||
+                selectedGroupIds.length === 0
+              }
+              onClick={handleGoToRegister}
+              type="button"
+            >
+              Continuar
+            </button>
+          </>
+        ) : (
+          <>
+            <section className="habit-hero">
+              <p>{selectedGroupLabel}</p>
+              <h1>Registrar meta</h1>
+              <span>Agora escolha o tipo e preencha o registro de hoje.</span>
+            </section>
+
+            {selectedGroupCount > 0 && (
+              <div className="habit-selected-group">
+                {selectedGroupCount === 1 && selectedGroup?.urlImagem ? (
+                  <img alt="" className="habit-group-avatar" src={selectedGroup.urlImagem} />
+                ) : (
+                  <span className="habit-group-avatar">
+                    {selectedGroupCount > 1
+                      ? selectedGroupCount
+                      : getGroupInitial(selectedGroup)}
+                  </span>
+                )}
+                <div>
+                  <span>Registrando em</span>
+                  <strong>{selectedGroupLabel}</strong>
+                  {selectedGroupNames && <small>{selectedGroupNames}</small>}
+                </div>
+                <button onClick={handleBackToGroups} type="button">
+                  Trocar
+                </button>
               </div>
             )}
 
-            {groups.length > 0 && (
-              <div className="group-choice-list">
-                {groups.map((group) => (
-                  <button
-                    className={selectedGroupId === group.id ? "active" : ""}
-                    key={group.id}
-                    onClick={() => setSelectedGroupId(group.id)}
-                    type="button"
-                  >
-                    <span>
-                      <strong>{group.name}</strong>
-                      <small>{group.description || "Grupo Movely"}</small>
-                    </span>
-                    <em>{selectedGroupId === group.id ? "Selecionado" : "Usar"}</em>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
+            <form className="habit-form" onSubmit={handleSubmit}>
+              <section className="habit-panel">
+                <div className="habit-panel-heading">
+                  <div>
+                    <span className="habit-kicker">Tipo de meta</span>
+                    <strong>{activeHabit.label}</strong>
+                  </div>
+                  <p>{activeHabit.helper}</p>
+                </div>
 
-          <section className="habit-section">
-            <div className="section-title">
-              <span>2</span>
-              <div>
-                <h2>Hábito</h2>
-                <p>{activeHabit.helper}</p>
-              </div>
-            </div>
-
-            <div className="habit-type-grid">
-              {(Object.keys(habits) as HabitType[]).map((type) => {
-                const habit = habits[type];
-
-                return (
-                  <button
-                    className={`habit-type-card ${habit.accent} ${
-                      habitType === type ? "active" : ""
-                    }`}
-                    key={type}
-                    onClick={() => {
-                      setHabitType(type);
-                      setSubmitStatus("idle");
-                      setMessage("");
-                    }}
-                    type="button"
-                  >
-                    <span>{habit.short}</span>
-                    <strong>{habit.label}</strong>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="habit-section">
-            <div className="section-title">
-              <span>3</span>
-              <div>
-                <h2>Dados</h2>
-                <p>{activeHabit.label}</p>
-              </div>
-            </div>
-
-            <div className="field-row">
-              <label className="field">
-                <span>ID do usuário</span>
-                <input
-                  inputMode="numeric"
-                  min="1"
-                  onChange={(event) => updateValue("userId", event.target.value)}
-                  placeholder="1"
-                  type="number"
-                  value={values.userId}
-                />
-              </label>
-
-              {habitType === "water" && (
-                <label className="field">
-                  <span>Mililitros</span>
-                  <input
-                    inputMode="decimal"
-                    min="1"
-                    onChange={(event) => updateValue("ml", event.target.value)}
-                    placeholder="500"
-                    type="number"
-                    value={values.ml}
-                  />
-                </label>
-              )}
-
-              {habitType === "steps" && (
-                <label className="field">
-                  <span>Passos</span>
-                  <input
-                    inputMode="numeric"
-                    min="1"
-                    onChange={(event) => updateValue("steps", event.target.value)}
-                    placeholder="8200"
-                    type="number"
-                    value={values.steps}
-                  />
-                </label>
-              )}
-
-              {(habitType === "sleep" || habitType === "study") && (
-                <label className="field">
-                  <span>Horas</span>
-                  <input
-                    inputMode="decimal"
-                    min="0.1"
-                    onChange={(event) => updateValue("hours", event.target.value)}
-                    placeholder={habitType === "sleep" ? "7.5" : "2"}
-                    step="0.1"
-                    type="number"
-                    value={values.hours}
-                  />
-                </label>
-              )}
-            </div>
-
-            {habitType === "sleep" && (
-              <label className="field">
-                <span>Qualidade</span>
-                <select
-                  onChange={(event) => updateValue("quality", event.target.value)}
-                  value={values.quality}
+                <div
+                  className="habit-type-grid"
+                  role="group"
+                  aria-label="Tipo de meta"
                 >
-                  <option value="1">Ruim</option>
-                  <option value="2">Regular</option>
-                  <option value="3">Boa</option>
-                  <option value="4">Muito boa</option>
-                  <option value="5">Excelente</option>
-                </select>
-              </label>
-            )}
+                  {(Object.keys(habits) as HabitType[]).map((type) => {
+                    const habit = habits[type];
 
-            {habitType === "workout" && (
-              <>
-                <label className="field">
-                  <span>Tipo de treino</span>
-                  <input
-                    onChange={(event) =>
-                      updateValue("workoutType", event.target.value)
-                    }
-                    placeholder="Musculação"
-                    type="text"
-                    value={values.workoutType}
-                  />
-                </label>
+                    return (
+                      <button
+                        className={`habit-type-card ${habit.accent} ${
+                          habitType === type ? "active" : ""
+                        }`}
+                        key={type}
+                        onClick={() => {
+                          setHabitType(type);
+                          setSubmitStatus("idle");
+                          setMessage("");
+                        }}
+                        type="button"
+                      >
+                        <span>{habit.short}</span>
+                        <strong>{habit.label}</strong>
+                        <small>{habit.helper}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className={`habit-panel habit-details ${activeHabit.accent}`}>
+                <div className="habit-panel-heading">
+                  <div>
+                    <span className="habit-kicker">Dados do registro</span>
+                    <strong>{activeHabit.label}</strong>
+                  </div>
+                  <p>Essas informações vão para os {selectedTargetText}.</p>
+                </div>
 
                 <div className="field-row">
                   <label className="field">
-                    <span>Minutos</span>
+                    <span>ID do usuário</span>
                     <input
                       inputMode="numeric"
                       min="1"
-                      onChange={(event) =>
-                        updateValue("durationMin", event.target.value)
-                      }
-                      placeholder="45"
+                      onChange={(event) => updateValue("userId", event.target.value)}
+                      placeholder="1"
                       type="number"
-                      value={values.durationMin}
+                      value={values.userId}
                     />
                   </label>
 
-                  <label className="field">
-                    <span>Carga</span>
-                    <input
-                      inputMode="decimal"
-                      min="0"
-                      onChange={(event) => updateValue("weight", event.target.value)}
-                      placeholder="20"
-                      step="0.1"
-                      type="number"
-                      value={values.weight}
-                    />
-                  </label>
+                  {habitType === "water" && (
+                    <label className="field">
+                      <span>Mililitros</span>
+                      <input
+                        inputMode="decimal"
+                        min="1"
+                        onChange={(event) => updateValue("ml", event.target.value)}
+                        placeholder="500"
+                        type="number"
+                        value={values.ml}
+                      />
+                    </label>
+                  )}
+
+                  {habitType === "steps" && (
+                    <label className="field">
+                      <span>Passos</span>
+                      <input
+                        inputMode="numeric"
+                        min="1"
+                        onChange={(event) => updateValue("steps", event.target.value)}
+                        placeholder="8200"
+                        type="number"
+                        value={values.steps}
+                      />
+                    </label>
+                  )}
+
+                  {(habitType === "sleep" || habitType === "study") && (
+                    <label className="field">
+                      <span>Horas</span>
+                      <input
+                        inputMode="decimal"
+                        min="0.1"
+                        onChange={(event) => updateValue("hours", event.target.value)}
+                        placeholder={habitType === "sleep" ? "7.5" : "2"}
+                        step="0.1"
+                        type="number"
+                        value={values.hours}
+                      />
+                    </label>
+                  )}
                 </div>
-              </>
-            )}
 
-            <label className="field">
-              <span>Observação</span>
-              <textarea
-                onChange={(event) => updateValue("notes", event.target.value)}
-                placeholder="Como foi hoje?"
-                value={values.notes}
-              />
-            </label>
-          </section>
+                {habitType === "sleep" && (
+                  <label className="field">
+                    <span>Qualidade</span>
+                    <select
+                      onChange={(event) =>
+                        updateValue("quality", event.target.value)
+                      }
+                      value={values.quality}
+                    >
+                      <option value="1">Ruim</option>
+                      <option value="2">Regular</option>
+                      <option value="3">Boa</option>
+                      <option value="4">Muito boa</option>
+                      <option value="5">Excelente</option>
+                    </select>
+                  </label>
+                )}
 
-          {message && submitStatus !== "idle" && (
-            <p className={`form-message ${submitStatus}`} role="status">
-              {message}
-            </p>
-          )}
+                {habitType === "workout" && (
+                  <>
+                    <label className="field">
+                      <span>Tipo de treino</span>
+                      <input
+                        onChange={(event) =>
+                          updateValue("workoutType", event.target.value)
+                        }
+                        placeholder="Musculação"
+                        type="text"
+                        value={values.workoutType}
+                      />
+                    </label>
 
-          <button
-            className="primary-button habit-submit"
-            disabled={submitStatus === "submitting" || loadStatus !== "ready"}
-            type="submit"
-          >
-            {submitStatus === "submitting" ? "Salvando..." : "Salvar registro"}
-          </button>
-        </form>
-      </section>
-    </main>
+                    <div className="field-row">
+                      <label className="field">
+                        <span>Minutos</span>
+                        <input
+                          inputMode="numeric"
+                          min="1"
+                          onChange={(event) =>
+                            updateValue("durationMin", event.target.value)
+                          }
+                          placeholder="45"
+                          type="number"
+                          value={values.durationMin}
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span>Carga</span>
+                        <input
+                          inputMode="decimal"
+                          min="0"
+                          onChange={(event) =>
+                            updateValue("weight", event.target.value)
+                          }
+                          placeholder="20"
+                          step="0.1"
+                          type="number"
+                          value={values.weight}
+                        />
+                      </label>
+                    </div>
+                  </>
+                )}
+
+                <label className="field">
+                  <span>Observação</span>
+                  <textarea
+                    onChange={(event) => updateValue("notes", event.target.value)}
+                    placeholder="Como foi hoje?"
+                    value={values.notes}
+                  />
+                </label>
+              </section>
+
+              {message && submitStatus !== "idle" && (
+                <p className={`form-message ${submitStatus}`} role="status">
+                  {message}
+                </p>
+              )}
+
+              <button
+                className="primary-button habit-submit"
+                disabled={submitStatus === "submitting" || loadStatus !== "ready"}
+                type="submit"
+              >
+                {submitStatus === "submitting" ? "Salvando..." : "Salvar registro"}
+              </button>
+            </form>
+          </>
+        )}
+      </main>
+
+      <BottomNav />
+    </div>
   );
 }
