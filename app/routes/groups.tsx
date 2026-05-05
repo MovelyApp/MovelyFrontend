@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import type { Route } from "./+types/groups";
 import BottomNav from "../components/bottomnav";
 import MobileHeader from "../components/mobileheader";
 import { apiFetch, getToken } from "../lib/api";
@@ -10,13 +9,14 @@ type Group = {
   name: string;
   description?: string;
   urlImagem?: string;
+  imageUrl?: string;
 };
 
 type GroupsResponse = {
   content?: Group[];
 };
 
-export function meta({}: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "Movely | Grupos" },
     {
@@ -38,7 +38,7 @@ export default function Groups() {
       return;
     }
 
-    apiFetch("/groups")
+    apiFetch("/api/groups")
       .then(async (response) => {
         if (!response.ok) {
           throw new Error("Erro ao buscar grupos");
@@ -83,10 +83,10 @@ export default function Groups() {
               Seus grupos
             </h2>
             <Link
-              to="/register-activity"
+              to="/groups/new"
               className="text-xs text-[#534AB7] hover:text-[#3C3489] font-medium"
             >
-              Registrar
+              Novo grupo
             </Link>
           </div>
 
@@ -116,10 +116,10 @@ export default function Groups() {
                 Nenhum grupo encontrado
               </p>
               <Link
-                to="/dashboard"
+                to="/groups/new"
                 className="inline-block px-4 py-2 bg-[#534AB7] text-white rounded-lg text-sm font-medium"
               >
-                Voltar ao início
+                Criar grupo
               </Link>
             </div>
           )}
@@ -142,14 +142,14 @@ export default function Groups() {
 function GroupCard({ group }: { group: Group }) {
   return (
     <Link
-      to="/register-activity"
+      to={`/groups/${group.id}/members`}
       className="bg-white border border-[#EEEDFE] rounded-2xl p-4 flex items-center gap-3"
     >
-      {group.urlImagem ? (
+      {group.urlImagem || group.imageUrl ? (
         <img
           alt=""
           className="w-12 h-12 rounded-2xl object-cover flex-shrink-0"
-          src={group.urlImagem}
+          src={group.urlImagem || group.imageUrl}
         />
       ) : (
         <div className="w-12 h-12 rounded-2xl bg-[#534AB7] text-white flex items-center justify-center text-lg font-medium flex-shrink-0">
@@ -167,7 +167,7 @@ function GroupCard({ group }: { group: Group }) {
       </div>
 
       <span className="text-xs text-[#534AB7] font-medium flex-shrink-0">
-        Registrar
+        Membros
       </span>
     </Link>
   );

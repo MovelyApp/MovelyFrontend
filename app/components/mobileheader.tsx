@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { apiFetch, clearToken } from "../lib/api";
+import { clearToken, getCurrentUser, getStoredUser } from "../lib/api";
 
 export default function MobileHeader() {
     const navigate = useNavigate();
@@ -8,9 +8,11 @@ export default function MobileHeader() {
     const [menuOpen, setMenuOpen] = useState(false);
 
     useEffect(() => {
-        apiFetch("/me")
-            .then((res) => (res.ok ? res.text() : ""))
-            .then((text) => setUsername(text || null))
+        const storedUser = getStoredUser();
+        setUsername(storedUser?.username ?? null);
+
+        getCurrentUser()
+            .then((user) => setUsername(user.username || null))
             .catch(() => setUsername(null));
     }, []);
 

@@ -9,12 +9,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/auth": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-      },
-      "/me": {
-        target: "http://localhost:8080",
+      "/api/goals": {
+        target: "http://44.204.111.20:8080",
         changeOrigin: true,
       },
       "/api": {
