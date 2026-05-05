@@ -1,7 +1,6 @@
-import type { Route } from "./+types/login";
 import { AuthScreen } from "../components/AuthScreen";
 
-export function meta({}: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "Movely | Entrar" },
     {
