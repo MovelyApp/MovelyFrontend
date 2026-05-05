@@ -17,6 +17,22 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true,
       },
+      "/groups": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/registers": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/challenges": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
     },
   },
 });

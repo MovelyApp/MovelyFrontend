@@ -24,7 +24,7 @@ export default function MobileHeader() {
 
             <div className="flex justify-between items-center">
 
-                <Link to="/" className="flex items-center gap-2">
+                <Link to="/dashboard" className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-full bg-[#3C3489] flex items-center justify-center">
                         <div className="w-4 h-4 rounded-full border-2 border-[#AFA9EC]" />
                     </div>

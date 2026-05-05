@@ -1,40 +1,46 @@
-const API_BASE = "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
-export function getToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("movely_token");
+export function getToken() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return (
+    window.localStorage.getItem("movely_token") ??
+    window.sessionStorage.getItem("movely_token") ??
+    ""
+  );
 }
 
-export function setToken(token: string): void {
-    localStorage.setItem("movely_token", token);
+export function clearToken() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem("movely_token");
+  window.sessionStorage.removeItem("movely_token");
 }
 
-export function clearToken(): void {
-    localStorage.removeItem("movely_token");
-}
+export async function apiFetch(path: string, options: RequestInit = {}) {
+  const token = getToken();
+  const headers = new Headers(options.headers);
 
-export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-    const token = getToken();
-    const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-    };
+  if (!headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
+  }
 
-    if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-    }
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
-    const res = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
-    });
+  });
 
-    if (res.status === 401) {
+  if (response.status === 401) {
     clearToken();
-    if (typeof window !== "undefined") {
-        window.location.href = "/login";
-    }
-    }
+  }
 
-    return res;
+  return response;
 }

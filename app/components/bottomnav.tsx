@@ -79,8 +79,8 @@ export default function BottomNav() {
     return (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#EEEDFE] flex justify-around items-center px-2 py-2 z-50 safe-area-bottom">
 
-            <NavLink to="/" label="Início" active={isActive("/")}>
-                <HomeIcon active={isActive("/")} />
+            <NavLink to="/dashboard" label="Início" active={isActive("/dashboard")}>
+                <HomeIcon active={isActive("/dashboard")} />
             </NavLink>
 
             <NavLink to="/groups" label="Grupos" active={isActive("/groups")}>
