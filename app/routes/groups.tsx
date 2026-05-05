@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "../components/bottomnav";
 import MobileHeader from "../components/mobileheader";
-import { apiFetch, getToken } from "../lib/api";
+import { apiFetch, getToken, readError } from "../lib/api";
 
 type Group = {
   id: string;
@@ -14,6 +14,14 @@ type Group = {
 
 type GroupsResponse = {
   content?: Group[];
+};
+
+type GroupInvite = {
+  id: number;
+  groupId: string;
+  groupName: string;
+  invitedByEmail?: string;
+  status: string;
 };
 
 export function meta() {
@@ -29,8 +37,39 @@ export function meta() {
 export default function Groups() {
   const navigate = useNavigate();
   const [groups, setGroups] = useState<Group[]>([]);
+  const [invites, setInvites] = useState<GroupInvite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actingInviteId, setActingInviteId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadGroupsAndInvites() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [groupsResponse, invitesResponse] = await Promise.all([
+        apiFetch("/api/groups"),
+        apiFetch("/api/groups/invites/mine"),
+      ]);
+
+      if (!groupsResponse.ok) {
+        throw new Error(await readError(groupsResponse, "Erro ao buscar grupos"));
+      }
+
+      const groupsData = (await groupsResponse.json()) as GroupsResponse | Group[];
+      setGroups(Array.isArray(groupsData) ? groupsData : groupsData.content ?? []);
+
+      if (invitesResponse.ok) {
+        setInvites((await invitesResponse.json()) as GroupInvite[]);
+      } else {
+        setInvites([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao buscar grupos");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!getToken()) {
@@ -38,24 +77,29 @@ export default function Groups() {
       return;
     }
 
-    apiFetch("/api/groups")
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Erro ao buscar grupos");
-        }
-
-        const data = (await response.json()) as GroupsResponse | Group[];
-        return Array.isArray(data) ? data : data.content ?? [];
-      })
-      .then((groupList) => {
-        setGroups(groupList);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : "Erro ao buscar grupos");
-        setLoading(false);
-      });
+    loadGroupsAndInvites();
   }, [navigate]);
+
+  async function handleInviteAction(inviteId: number, action: "accept" | "decline") {
+    setActingInviteId(inviteId);
+    setError(null);
+
+    try {
+      const response = await apiFetch(`/api/groups/invites/${inviteId}/${action}`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readError(response, "Nao foi possivel responder o convite"));
+      }
+
+      await loadGroupsAndInvites();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Nao foi possivel responder o convite");
+    } finally {
+      setActingInviteId(null);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAF8] pb-24">
@@ -76,6 +120,53 @@ export default function Groups() {
             Escolha um grupo no registro para pontuar nele.
           </p>
         </section>
+
+        {invites.length > 0 && (
+          <section className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-base font-medium text-[#1a1a1a]">
+                Convites pendentes
+              </h2>
+              <span className="text-xs text-[#534AB7] font-medium">
+                {invites.length}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {invites.map((invite) => (
+                <article
+                  className="bg-white border border-[#CECBF6] rounded-2xl p-4"
+                  key={invite.id}
+                >
+                  <p className="text-sm font-medium text-[#1a1a1a]">
+                    {invite.groupName}
+                  </p>
+                  <p className="text-xs text-[#888] mt-1">
+                    Convite de {invite.invitedByEmail || "Movely"}
+                  </p>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      className="flex-1 h-10 rounded-xl bg-[#534AB7] text-white text-xs font-medium disabled:opacity-60"
+                      disabled={actingInviteId === invite.id}
+                      onClick={() => handleInviteAction(invite.id, "accept")}
+                      type="button"
+                    >
+                      Aceitar
+                    </button>
+                    <button
+                      className="flex-1 h-10 rounded-xl border border-[#CECBF6] text-[#534AB7] text-xs font-medium disabled:opacity-60"
+                      disabled={actingInviteId === invite.id}
+                      onClick={() => handleInviteAction(invite.id, "decline")}
+                      type="button"
+                    >
+                      Recusar
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mb-6">
           <div className="flex justify-between items-center mb-4">
