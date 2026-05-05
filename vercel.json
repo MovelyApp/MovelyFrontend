@@ -1,24 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/auth/:path*",
-      "destination": "http://44.204.111.20:8080/auth/:path*"
+      "source": "/api/goals",
+      "destination": "http://44.204.111.20:8080/api/goals"
     },
     {
-      "source": "/me",
-      "destination": "http://44.204.111.20:8080/me"
-    },
-    {
-      "source": "/groups/:path*",
-      "destination": "http://44.204.111.20:8080/groups/:path*"
-    },
-    {
-      "source": "/registers/:path*",
-      "destination": "http://44.204.111.20:8080/registers/:path*"
-    },
-    {
-      "source": "/challenges/:path*",
-      "destination": "http://44.204.111.20:8080/challenges/:path*"
+      "source": "/api/goals/:path*",
+      "destination": "http://44.204.111.20:8080/api/goals/:path*"
     },
     {
       "source": "/api/:path*",

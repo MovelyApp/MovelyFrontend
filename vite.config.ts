@@ -2,6 +2,8 @@ import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
+const devBackendUrl = process.env.VITE_DEV_API_URL ?? "http://localhost:8080";
+
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter()],
   resolve: {
@@ -9,16 +11,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/auth": {
-        target: "http://localhost:8080",
-        changeOrigin: true,
-      },
-      "/me": {
-        target: "http://localhost:8080",
+      "/api/goals": {
+        target: devBackendUrl,
         changeOrigin: true,
       },
       "/api": {
-        target: "http://44.204.111.20:8080",
+        target: devBackendUrl,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },

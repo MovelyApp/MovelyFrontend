@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "./bottomnav";
 import MobileHeader from "./mobileheader";
-import { apiFetch, getToken } from "../lib/api";
+import { apiFetch, getCurrentUser, getStoredUser, getToken } from "../lib/api";
 
 type HabitType = "water" | "steps" | "sleep" | "workout" | "study";
 type LoadStatus = "loading" | "ready" | "error";
@@ -45,35 +45,35 @@ const habits: Record<
   water: {
     label: "Água",
     helper: "Quantidade em ml",
-    endpoint: "/registers/water",
+    endpoint: "/api/registers/water",
     accent: "blue",
     short: "Ag",
   },
   steps: {
     label: "Passos",
     helper: "Total de passos",
-    endpoint: "/registers/steps",
+    endpoint: "/api/registers/steps",
     accent: "green",
     short: "Ps",
   },
   workout: {
     label: "Treino",
     helper: "Tipo e duração",
-    endpoint: "/registers/workout",
+    endpoint: "/api/registers/workout",
     accent: "orange",
     short: "Tr",
   },
   sleep: {
     label: "Sono",
     helper: "Horas e qualidade",
-    endpoint: "/registers/sleep",
+    endpoint: "/api/registers/sleep",
     accent: "pink",
     short: "So",
   },
   study: {
     label: "Estudo",
     helper: "Tempo estudado",
-    endpoint: "/registers/study",
+    endpoint: "/api/registers/study",
     accent: "purple",
     short: "Es",
   },
@@ -96,7 +96,8 @@ function getStoredUserId() {
     return "";
   }
 
-  return window.localStorage.getItem("movely_user_id") ?? "";
+  const storedUser = getStoredUser();
+  return storedUser?.id ? String(storedUser.id) : window.localStorage.getItem("movely_user_id") ?? "";
 }
 
 function saveStoredUserId(userId: string) {
@@ -119,7 +120,7 @@ function getValidationMessage(
   }
 
   if (!Number(values.userId) || Number(values.userId) < 1) {
-    return "Informe um ID de usuário válido.";
+    return "Sessao expirada. Entre novamente.";
   }
 
   if (habitType === "water" && (!Number(values.ml) || Number(values.ml) <= 0)) {
@@ -239,16 +240,19 @@ export function HabitRegisterScreen() {
       return;
     }
 
-    apiFetch("/groups")
-      .then(async (response) => {
+    Promise.all([
+      getCurrentUser(),
+      apiFetch("/api/groups").then(async (response) => {
         if (!response.ok) {
           throw new Error(await readError(response));
         }
 
         const data = (await response.json()) as GroupsResponse | Group[];
         return Array.isArray(data) ? data : data.content ?? [];
-      })
-      .then((groupList) => {
+      }),
+    ])
+      .then(([user, groupList]) => {
+        setValues((current) => ({ ...current, userId: String(user.id) }));
         setGroups(groupList);
         setSelectedGroupIds((current) => {
           const validIds = current.filter((id) =>
@@ -268,7 +272,7 @@ export function HabitRegisterScreen() {
         setMessage(
           error instanceof Error
             ? error.message
-            : "Não foi possível carregar os grupos.",
+            : "Nao foi possivel carregar seus dados.",
         );
       });
   }, [navigate]);
@@ -547,19 +551,7 @@ export function HabitRegisterScreen() {
                   <p>Essas informações vão para os {selectedTargetText}.</p>
                 </div>
 
-                <div className="field-row">
-                  <label className="field">
-                    <span>ID do usuário</span>
-                    <input
-                      inputMode="numeric"
-                      min="1"
-                      onChange={(event) => updateValue("userId", event.target.value)}
-                      placeholder="1"
-                      type="number"
-                      value={values.userId}
-                    />
-                  </label>
-
+                <div className="field-row habit-primary-fields">
                   {habitType === "water" && (
                     <label className="field">
                       <span>Mililitros</span>

@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { apiFetch, getCurrentUser } from "../lib/api";
 
 type AuthMode = "login" | "register";
 type RequestStatus = "idle" | "submitting" | "success" | "error";
@@ -7,8 +8,6 @@ type RequestStatus = "idle" | "submitting" | "success" | "error";
 type AuthScreenProps = {
   mode: AuthMode;
 };
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 const authCopy = {
   login: {
@@ -40,8 +39,16 @@ function getFriendlyError(message: string) {
     return "Não foi possível concluir agora. Tente novamente.";
   }
 
+  if (message.includes("Email already exists") || message.includes("User already exists")) {
+    return "Esse email ja existe. Tente entrar com ele.";
+  }
+
   if (message.includes("User already exists")) {
     return "Esse usuário já existe. Tente entrar ou escolha outro nome.";
+  }
+
+  if (message.includes("Bad credentials") || message.includes("Unauthorized")) {
+    return "Email ou senha invalidos.";
   }
 
   if (message.includes("Bad credentials") || message.includes("Unauthorized")) {
@@ -91,7 +98,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
     if (!trimmedUsername || !password) {
       setStatus("error");
-      setMessage("Preencha usuário e senha para continuar.");
+      setMessage("Preencha email e senha para continuar.");
       return;
     }
 
@@ -104,19 +111,14 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     setStatus("submitting");
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}${isRegister ? "/auth/register" : "/auth/login"}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: trimmedUsername,
-            password,
-          }),
-        },
-      );
+      const response = await apiFetch(isRegister ? "/api/auth/register" : "/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          username: trimmedUsername.toLowerCase(),
+          email: isRegister ? trimmedUsername.toLowerCase() : undefined,
+          password,
+        }),
+      });
 
       const responseText = await response.text();
 
@@ -131,10 +133,19 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           throw new Error("Login realizado, mas o backend nao retornou um token.");
         }
 
+        window.localStorage.removeItem("movely_user");
+        window.localStorage.removeItem("movely_user_id");
+
         if (remember) {
           window.localStorage.setItem("movely_token", token);
+          window.localStorage.setItem("token", token);
+          window.sessionStorage.removeItem("movely_token");
+          window.sessionStorage.removeItem("token");
         } else {
           window.sessionStorage.setItem("movely_token", token);
+          window.sessionStorage.setItem("token", token);
+          window.localStorage.removeItem("movely_token");
+          window.localStorage.removeItem("token");
         }
       }
 
@@ -142,6 +153,12 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       setMessage(copy.success);
 
       if (!isRegister) {
+        try {
+          await getCurrentUser();
+        } catch {
+          // The dashboard will retry /me. Login should not fail after a valid token.
+        }
+
         navigate("/dashboard");
         return;
       }
@@ -194,13 +211,13 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label className="field">
-              <span>Usuário</span>
+              <span>Email</span>
               <input
-                autoComplete="username"
+                autoComplete="email"
                 name="username"
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder="seu.usuario"
-                type="text"
+                placeholder="voce@email.com"
+                type="email"
                 value={username}
               />
             </label>

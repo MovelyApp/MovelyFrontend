@@ -1,14 +1,24 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { apiFetch, apiJson, getCurrentUser, getToken, readError } from "../lib/api";
 
 type RequestStatus = "idle" | "loading" | "submitting" | "success" | "error";
+
+type User = {
+  id: number;
+  username: string;
+  email?: string | null;
+};
 
 type Group = {
   id: string;
   name: string;
-  description: string;
-  createdAt?: string;
+  description?: string;
+  urlImagem?: string;
   imageUrl?: string;
+  ownerId?: number | null;
+  ownerEmail?: string | null;
+  users?: User[];
 };
 
 type PageResponse<T> = {
@@ -16,79 +26,6 @@ type PageResponse<T> = {
   items?: T[];
   data?: T[];
 };
-
-type MockUser = {
-  id: string;
-  name: string;
-  username: string;
-  color: "lavender" | "green" | "blue" | "pink" | "amber";
-};
-
-type PendingInvite = {
-  groupId: string;
-  userId: string;
-  name: string;
-  username: string;
-  invitedAt: string;
-};
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
-const GROUPS_URL = API_BASE_URL ? `${API_BASE_URL}/groups` : "/api/groups";
-const INVITES_STORAGE_KEY = "movely_pending_member_invites";
-
-const mockUsers: MockUser[] = [
-  { id: "user-1", name: "Lia Martins", username: "@liamove", color: "lavender" },
-  { id: "user-2", name: "Caio Breno", username: "@caiotreina", color: "green" },
-  { id: "user-3", name: "Nina Rocha", username: "@ninapassos", color: "blue" },
-  { id: "user-4", name: "Theo Lima", username: "@theosono", color: "pink" },
-  { id: "user-5", name: "Bia Torres", username: "@biaestuda", color: "amber" },
-];
-
-const initialMembers: MockUser[] = [
-  { id: "member-1", name: "Maya Costa", username: "@mayahidra", color: "green" },
-  { id: "member-2", name: "Rafa Nunes", username: "@rafafit", color: "lavender" },
-];
-
-function getStoredToken() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return (
-    window.localStorage.getItem("movely_token") ||
-    window.sessionStorage.getItem("movely_token") ||
-    window.localStorage.getItem("token") ||
-    ""
-  );
-}
-
-function getAuthHeaders(extra: Record<string, string> = {}) {
-  const token = getStoredToken();
-  const headers: Record<string, string> = { ...extra };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  return headers;
-}
-
-async function fetchJson<T>(url: string, init: RequestInit = {}) {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      ...getAuthHeaders(),
-      ...(init.headers as Record<string, string> | undefined),
-    },
-  });
-  const responseText = await response.text();
-
-  if (!response.ok) {
-    throw new Error(responseText || response.statusText);
-  }
-
-  return responseText ? (JSON.parse(responseText) as T) : (null as T);
-}
 
 function getPageItems<T>(response: PageResponse<T> | T[] | null) {
   if (!response) {
@@ -111,51 +48,29 @@ function getInitials(name: string) {
     .join("");
 }
 
-function savePendingInvite(invite: PendingInvite) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  let currentInvites: PendingInvite[] = [];
-  const storedInvites = window.localStorage.getItem(INVITES_STORAGE_KEY);
-
-  if (storedInvites) {
-    try {
-      currentInvites = JSON.parse(storedInvites) as PendingInvite[];
-    } catch {
-      currentInvites = [];
-    }
-  }
-
-  const nextInvites = currentInvites.filter((item) => {
-    return item.groupId !== invite.groupId || item.userId !== invite.userId;
-  });
-
-  window.localStorage.setItem(
-    INVITES_STORAGE_KEY,
-    JSON.stringify([...nextInvites, invite]),
-  );
+function getGroupImage(group?: Group | null) {
+  return group?.urlImagem || group?.imageUrl || "";
 }
 
-function GroupAvatar({
-  name,
-  imageUrl,
-  color = "lavender",
-  large = false,
-}: {
-  name: string;
-  imageUrl?: string;
-  color?: MockUser["color"];
-  large?: boolean;
-}) {
+function GroupAvatar({ name, imageUrl }: { name: string; imageUrl?: string }) {
   return (
-    <div className={`group-avatar ${color} ${large ? "large" : ""}`}>
+    <div className="group-avatar lavender">
       {imageUrl ? <img alt="" src={imageUrl} /> : <span>{getInitials(name)}</span>}
     </div>
   );
 }
 
-function GroupTopBar({ title, backTo = "/" }: { title: string; backTo?: string }) {
+function UserAvatar({ username, id }: { username: string; id: number }) {
+  const colors = ["lavender", "green", "blue", "pink", "amber"];
+
+  return (
+    <div className={`group-avatar ${colors[id % colors.length]}`}>
+      <span>{getInitials(username)}</span>
+    </div>
+  );
+}
+
+function GroupTopBar({ title, backTo = "/groups" }: { title: string; backTo?: string }) {
   return (
     <header className="group-topbar">
       <Link aria-label="Voltar" className="group-back-button" to={backTo}>
@@ -180,23 +95,14 @@ export function CreateGroupScreen() {
 
   const canSubmit = name.trim().length > 0 && description.trim().length > 0;
 
-  async function findCreatedGroupId(groupName: string) {
-    try {
-      const response = await fetchJson<PageResponse<Group> | Group[]>(GROUPS_URL);
-      const normalizedName = groupName.trim().toLowerCase();
-      const group = getPageItems(response).find((item) => {
-        return item.name.trim().toLowerCase() === normalizedName;
-      });
-
-      return group?.id;
-    } catch {
-      return undefined;
-    }
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+
+    if (!getToken()) {
+      navigate("/login");
+      return;
+    }
 
     if (!canSubmit) {
       setStatus("error");
@@ -204,40 +110,34 @@ export function CreateGroupScreen() {
       return;
     }
 
-    const payload = {
-      name: name.trim(),
-      description: description.trim(),
-      imageUrl: imageUrl.trim() || undefined,
-    };
-
     setStatus("submitting");
 
     try {
-      const createdGroup = await fetchJson<Partial<Group> | null>(GROUPS_URL, {
+      const createdGroup = await apiJson<Group>("/api/groups", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim(),
+          urlImagem: imageUrl.trim() || undefined,
+        }),
       });
-      const createdGroupId = createdGroup?.id ?? (await findCreatedGroupId(payload.name));
 
       setStatus("success");
       setMessage("Grupo criado com sucesso.");
 
-      if (createdGroupId) {
-        window.setTimeout(() => {
-          navigate(`/groups/${createdGroupId}/members`);
-        }, 650);
-      }
-    } catch {
+      window.setTimeout(() => {
+        navigate(createdGroup?.id ? `/groups/${createdGroup.id}/members` : "/groups");
+      }, 650);
+    } catch (error) {
       setStatus("error");
-      setMessage("Nao foi possivel criar o grupo agora. Confira seu login e tente novamente.");
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel criar o grupo.");
     }
   }
 
   return (
     <main className="group-page">
       <section className="group-phone" aria-label="Criar grupo Movely">
-        <GroupTopBar title="Criar Grupo" backTo="/" />
+        <GroupTopBar title="Criar Grupo" />
 
         <form className="group-form" onSubmit={handleSubmit}>
           <button
@@ -246,11 +146,7 @@ export function CreateGroupScreen() {
             onClick={() => setShowImageField((current) => !current)}
             type="button"
           >
-            {imageUrl ? (
-              <img alt="Preview do grupo" src={imageUrl} />
-            ) : (
-              <span aria-hidden="true">+</span>
-            )}
+            {imageUrl ? <img alt="Preview do grupo" src={imageUrl} /> : <span aria-hidden="true">+</span>}
           </button>
           <p className="group-photo-help">Toque para adicionar uma imagem ao grupo.</p>
 
@@ -315,96 +211,193 @@ export function CreateGroupScreen() {
 
 export function AddMembersScreen() {
   const { id } = useParams();
-  const [query, setQuery] = useState("");
+  const navigate = useNavigate();
+  const [memberEmail, setMemberEmail] = useState("");
   const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState(initialMembers);
-  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [foundUser, setFoundUser] = useState<User | null>(null);
+  const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
   const [status, setStatus] = useState<RequestStatus>("loading");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    let isActive = true;
+  const members = group?.users ?? [];
+  const foundUserEmail = foundUser?.email || foundUser?.username || "";
+  const foundUserIsMember = foundUser
+    ? members.some((member) => member.id === foundUser.id)
+    : false;
+  const foundUserWasInvited = invitedEmails.includes(foundUserEmail.toLowerCase());
+  const canManageMembers = group ? !group.ownerId || currentUserId === group.ownerId : false;
+  const groupId = group?.id || id || "";
 
-    async function loadGroup() {
-      setStatus("loading");
-      setMessage("");
-
-      try {
-        const response = await fetchJson<PageResponse<Group> | Group[]>(GROUPS_URL);
-        const foundGroup = getPageItems(response).find((item) => item.id === id) ?? null;
-
-        if (!isActive) {
-          return;
-        }
-
-        setGroup(foundGroup);
-        setStatus("idle");
-
-        if (!foundGroup) {
-          setMessage("Grupo nao encontrado. Voce ainda pode visualizar a tela com dados locais.");
-        }
-      } catch {
-        if (isActive) {
-          setStatus("error");
-          setMessage("Nao foi possivel carregar o grupo agora. Dados locais continuam disponiveis.");
-        }
-      }
-    }
-
-    loadGroup();
-
-    return () => {
-      isActive = false;
-    };
-  }, [id]);
-
-  const filteredUsers = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return mockUsers;
-    }
-
-    return mockUsers.filter((user) => {
-      return (
-        user.name.toLowerCase().includes(normalizedQuery) ||
-        user.username.toLowerCase().includes(normalizedQuery)
-      );
-    });
-  }, [query]);
-
-  function handleInvite(user: MockUser) {
+  async function loadData() {
     if (!id) {
+      setStatus("error");
+      setMessage("Grupo nao encontrado.");
       return;
     }
 
-    setInvitedIds((current) => (current.includes(user.id) ? current : [...current, user.id]));
-    savePendingInvite({
-      groupId: id,
-      userId: user.id,
-      name: user.name,
-      username: user.username,
-      invitedAt: new Date().toISOString(),
-    });
+    setStatus("loading");
     setMessage("");
+
+    try {
+      const [groupsResponse, currentUser] = await Promise.all([
+        apiJson<PageResponse<Group> | Group[]>("/api/groups?size=100"),
+        getCurrentUser().catch(() => null),
+      ]);
+      const foundGroup = getPageItems(groupsResponse).find((item) => item.id === id) ?? null;
+
+      setCurrentUserId(currentUser?.id ?? null);
+      setGroup(foundGroup);
+      setStatus(foundGroup ? "idle" : "error");
+      setMessage(foundGroup ? "" : "Grupo nao encontrado.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel carregar o grupo.");
+    }
   }
 
-  function handleFinish() {
-    setStatus("success");
-    setMessage("Convites registrados localmente. Quando a rota de membros existir, eu conecto no banco.");
+  useEffect(() => {
+    if (!getToken()) {
+      navigate("/login");
+      return;
+    }
+
+    loadData();
+  }, [id, navigate]);
+
+  async function handleSearchByEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!id) {
+      setStatus("error");
+      setMessage("Grupo nao encontrado.");
+      return;
+    }
+
+    const normalizedEmail = memberEmail.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setStatus("error");
+      setMessage("Digite o email da pessoa.");
+      return;
+    }
+
+    setStatus("submitting");
+    setMessage("");
+    setFoundUser(null);
+
+    try {
+      const usersResponse = await apiJson<PageResponse<User> | User[]>(
+        `/api/users?email=${encodeURIComponent(normalizedEmail)}`,
+      );
+      const user = getPageItems(usersResponse).find((item) => {
+        const itemEmail = (item.email || item.username || "").trim().toLowerCase();
+        const itemUsername = (item.username || "").trim().toLowerCase();
+
+        return itemEmail === normalizedEmail || itemUsername === normalizedEmail;
+      });
+
+      if (!user) {
+        throw new Error("Nenhum usuario encontrado com esse email.");
+      }
+
+      setFoundUser(user);
+      setStatus("success");
+      setMessage("Usuario encontrado. Agora voce pode enviar o convite.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Nenhum usuario encontrado com esse email.");
+    }
+  }
+
+  async function handleInviteUser() {
+    if (!groupId || !foundUserEmail) {
+      setStatus("error");
+      setMessage("Grupo ou usuario nao identificado.");
+      return;
+    }
+
+    if (foundUserIsMember) {
+      setStatus("error");
+      setMessage("Essa pessoa ja esta no grupo.");
+      return;
+    }
+
+    setStatus("submitting");
+    setMessage("");
+
+    try {
+      const response = await apiFetch(
+        `/api/groups/add?groupId=${encodeURIComponent(groupId)}&userId=${foundUser?.id ?? ""}&email=${encodeURIComponent(foundUserEmail)}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            groupId,
+            userId: foundUser?.id,
+            email: foundUserEmail,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(await readError(response, "Nao foi possivel enviar o convite."));
+      }
+
+      await response.json();
+      setInvitedEmails((current) => [...current, foundUserEmail.toLowerCase()]);
+      setMemberEmail("");
+      setStatus("success");
+      setMessage("Convite enviado. A pessoa precisa aceitar para entrar no grupo.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel enviar o convite.");
+    }
+  }
+
+  async function handleRemoveMember(userId: number) {
+    if (!groupId) {
+      setStatus("error");
+      setMessage("Grupo nao encontrado.");
+      return;
+    }
+
+    setStatus("submitting");
+    setMessage("");
+
+    try {
+      const response = await apiFetch("/api/groups/remove", {
+        method: "POST",
+        body: JSON.stringify({
+          groupId,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readError(response, "Nao foi possivel remover o membro."));
+      }
+
+      const updatedGroup = (await response.json()) as Group;
+      setGroup(updatedGroup);
+      setStatus("success");
+      setMessage("Membro removido do grupo.");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Nao foi possivel remover o membro.");
+    }
   }
 
   return (
     <main className="group-page">
       <section className="group-phone" aria-label="Adicionar membros ao grupo">
-        <GroupTopBar title="Adicionar Membros" backTo="/groups/new" />
+        <GroupTopBar title={canManageMembers ? "Adicionar Membros" : "Membros do Grupo"} />
 
         {group && (
           <div className="group-current-card">
-            <GroupAvatar imageUrl={group.imageUrl} name={group.name} />
+            <GroupAvatar imageUrl={getGroupImage(group)} name={group.name} />
             <div>
               <p>{group.name}</p>
-              <span>{group.description}</span>
+              <span>{group.description || "Grupo Movely"}</span>
             </div>
           </div>
         )}
@@ -421,46 +414,72 @@ export function AddMembersScreen() {
           </p>
         )}
 
-        <label className="group-search" aria-label="Buscar por username">
-          <span aria-hidden="true">@</span>
-          <input
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por username..."
-            type="search"
-            value={query}
-          />
-        </label>
+        {group && canManageMembers ? (
+          <>
+            <form className="member-id-form" onSubmit={handleSearchByEmail}>
+              <label className="field group-field">
+                <span>Email do membro</span>
+                <input
+                  autoComplete="email"
+                  inputMode="email"
+                  onChange={(event) => {
+                    setMemberEmail(event.target.value);
+                    setFoundUser(null);
+                    setMessage("");
+                  }}
+                  placeholder="pessoa@email.com"
+                  type="email"
+                  value={memberEmail}
+                />
+              </label>
+              <button
+                className="invite-button member-id-button"
+                disabled={status === "submitting"}
+                type="submit"
+              >
+                {status === "submitting" ? "Buscando..." : "Buscar"}
+              </button>
+              <p>Digite o email completo. O Movely so mostra resultado se esse usuario existir.</p>
+            </form>
 
-        <section className="group-section">
-          <div className="group-section-heading">
-            <h2>Resultados</h2>
-            <span>{filteredUsers.length}</span>
-          </div>
+            <section className="group-section">
+              <div className="group-section-heading">
+                <h2>Resultado</h2>
+                <span>{foundUser ? 1 : 0}</span>
+              </div>
 
-          <div className="member-list">
-            {filteredUsers.map((user) => {
-              const isInvited = invitedIds.includes(user.id);
-
-              return (
-                <article className="member-row" key={user.id}>
-                  <GroupAvatar color={user.color} name={user.name} />
-                  <div>
-                    <p>{user.name}</p>
-                    <span>{user.username}</span>
+              <div className="member-list">
+                {foundUser ? (
+                  <article className="member-row">
+                    <UserAvatar id={foundUser.id} username={foundUser.username} />
+                    <div>
+                      <p>{foundUser.username}</p>
+                      <span>{foundUserEmail}</span>
+                    </div>
+                    <button
+                      className={`invite-button ${foundUserWasInvited ? "invited" : ""}`}
+                      disabled={status === "submitting" || foundUserIsMember || foundUserWasInvited}
+                      onClick={handleInviteUser}
+                      type="button"
+                    >
+                      {foundUserIsMember ? "Ja esta" : foundUserWasInvited ? "Convidado" : "Adicionar"}
+                    </button>
+                  </article>
+                ) : (
+                  <div className="member-empty">
+                    <strong>Nenhum email buscado</strong>
+                    <span>Procure pelo email exato para enviar um convite privado.</span>
                   </div>
-                  <button
-                    className={isInvited ? "invite-button invited" : "invite-button"}
-                    disabled={isInvited}
-                    onClick={() => handleInvite(user)}
-                    type="button"
-                  >
-                    {isInvited ? "Convidado" : "Convidar"}
-                  </button>
-                </article>
-              );
-            })}
+                )}
+              </div>
+            </section>
+          </>
+        ) : group ? (
+          <div className="member-empty">
+            <strong>Convites ficam com quem criou o grupo</strong>
+            <span>Voce pode ver os membros, mas so a pessoa criadora consegue convidar ou remover.</span>
           </div>
-        </section>
+        ) : null}
 
         <section className="group-section">
           <div className="group-section-heading">
@@ -471,29 +490,30 @@ export function AddMembersScreen() {
           <div className="member-list">
             {members.map((member) => (
               <article className="member-row" key={member.id}>
-                <GroupAvatar color={member.color} name={member.name} />
+                <UserAvatar id={member.id} username={member.username} />
                 <div>
-                  <p>{member.name}</p>
-                  <span>{member.username}</span>
+                  <p>{member.username}</p>
+                  <span>{member.email || member.username}</span>
                 </div>
-                <button
-                  aria-label={`Remover ${member.name}`}
-                  className="remove-member-button"
-                  onClick={() =>
-                    setMembers((current) => current.filter((item) => item.id !== member.id))
-                  }
-                  type="button"
-                >
-                  x
-                </button>
+                {canManageMembers && (
+                  <button
+                    aria-label={`Remover ${member.username}`}
+                    className="remove-member-button"
+                    disabled={status === "submitting"}
+                    onClick={() => handleRemoveMember(member.id)}
+                    type="button"
+                  >
+                    x
+                  </button>
+                )}
               </article>
             ))}
           </div>
         </section>
 
-        <button className="primary-button group-bottom-button" onClick={handleFinish} type="button">
+        <Link className="primary-button group-bottom-button" to="/groups">
           Concluir
-        </button>
+        </Link>
       </section>
     </main>
   );

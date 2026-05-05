@@ -275,6 +275,19 @@ button {
   resize: vertical;
 }
 
+.readonly-field {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: #4f4b57;
+  background: #f7f5ff;
+  border: 1px solid var(--movely-line);
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
 .field:focus-within > span {
   color: var(--movely-primary);
 }
@@ -746,6 +759,224 @@ button {
   }
 }
 
+.group-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background:
+    linear-gradient(180deg, rgba(175, 169, 236, 0.14), transparent 34%),
+    var(--movely-deep);
+}
+
+.group-phone {
+  width: min(430px, 100%);
+  min-height: min(860px, calc(100svh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 20px 20px;
+  color: #fafaf8;
+  background: var(--movely-deep);
+  border: 1px solid rgba(175, 169, 236, 0.28);
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(16, 12, 55, 0.34);
+}
+
+.group-topbar {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.group-back-button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #fafaf8;
+  background: rgba(250, 250, 248, 0.1);
+  border: 1px solid rgba(175, 169, 236, 0.28);
+  border-radius: 14px;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.group-topbar p,
+.group-topbar h1 {
+  margin: 0;
+}
+
+.group-topbar p {
+  color: var(--movely-lavender);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.group-topbar h1 {
+  margin-top: 3px;
+  color: #fafaf8;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.group-form {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 15px;
+}
+
+.group-photo-button {
+  width: 116px;
+  height: 116px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  overflow: hidden;
+  color: #fafaf8;
+  background: var(--movely-card);
+  border: 1px solid rgba(175, 169, 236, 0.45);
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 18px 38px rgba(16, 12, 55, 0.22);
+}
+
+.group-photo-button span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: var(--movely-primary);
+  border-radius: 999px;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.group-photo-button img,
+.group-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.group-photo-help {
+  margin: -6px 0 2px;
+  color: rgba(250, 250, 248, 0.68);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.group-field > span {
+  color: rgba(250, 250, 248, 0.82);
+}
+
+.group-field input,
+.group-field textarea {
+  color: #fafaf8;
+  background: rgba(250, 250, 248, 0.09);
+  border-color: rgba(175, 169, 236, 0.32);
+}
+
+.group-field input:hover,
+.group-field textarea:hover,
+.group-field input:focus,
+.group-field textarea:focus {
+  color: #ffffff;
+  background: rgba(250, 250, 248, 0.13);
+  border-color: var(--movely-lavender);
+}
+
+.group-field input::placeholder,
+.group-field textarea::placeholder {
+  color: rgba(250, 250, 248, 0.48);
+}
+
+.group-preview-card,
+.group-current-card,
+.member-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  color: #fafaf8;
+  background: var(--movely-card);
+  border: 1px solid rgba(175, 169, 236, 0.24);
+  border-radius: 18px;
+}
+
+.group-preview-card p,
+.group-current-card p,
+.member-row p {
+  margin: 0;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.group-current-card {
+  background: rgba(60, 52, 137, 0.92);
+}
+
+.member-row {
+  min-height: 72px;
+  background: rgba(250, 250, 248, 0.08);
+}
+
+.member-id-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  background: rgba(250, 250, 248, 0.08);
+  border: 1px solid rgba(175, 169, 236, 0.28);
+  border-radius: 20px;
+}
+
+.member-id-form p {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+  color: rgba(250, 250, 248, 0.62);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.member-id-button {
+  height: 56px;
+  padding: 0 16px;
+  border-radius: 16px;
+}
+
+.member-empty {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  color: rgba(250, 250, 248, 0.74);
+  background: rgba(250, 250, 248, 0.07);
+  border: 1px dashed rgba(175, 169, 236, 0.28);
+  border-radius: 16px;
+}
+
+.member-empty strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.member-empty span {
+  margin: 0;
+  color: rgba(250, 250, 248, 0.62);
+  font-size: 12px;
+}
+
 .group-choice-list {
   display: grid;
   gap: 10px;
@@ -791,9 +1022,9 @@ button {
   font-weight: 900;
 }
 
-.group-preview-card span,
-.group-current-card span,
-.member-row span {
+.group-preview-card > div:last-child span,
+.group-current-card > div:last-child span,
+.member-row > div:nth-child(2) span {
   display: block;
   margin-top: 3px;
   color: rgba(250, 250, 248, 0.66);
@@ -809,12 +1040,12 @@ button {
   flex: 1;
 }
 
-.group-preview-card p,
-.group-preview-card span,
-.group-current-card p,
-.group-current-card span,
-.member-row p,
-.member-row span {
+.group-preview-card > div:last-child p,
+.group-preview-card > div:last-child span,
+.group-current-card > div:last-child p,
+.group-current-card > div:last-child span,
+.member-row > div:nth-child(2) p,
+.member-row > div:nth-child(2) span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -947,6 +1178,13 @@ button {
   transform: translateY(-1px);
 }
 
+.invite-button:disabled,
+.remove-member-button:disabled {
+  cursor: wait;
+  opacity: 0.66;
+  transform: none;
+}
+
 .invite-button.invited {
   color: var(--movely-deep);
   background: var(--movely-lavender-card);
@@ -978,7 +1216,14 @@ button {
 }
 
 .group-bottom-button {
+  min-height: 56px;
+  position: sticky;
+  bottom: 12px;
+  z-index: 2;
   margin-top: auto;
+  box-shadow: 0 18px 42px rgba(16, 12, 55, 0.28);
+}
+
 .group-choice-list small {
   color: var(--movely-muted);
   font-size: 13px;
@@ -1075,6 +1320,10 @@ button {
   gap: 12px;
 }
 
+.field-row.habit-primary-fields {
+  grid-template-columns: 1fr;
+}
+
 .habit-submit {
   margin-top: 0;
 }
@@ -1150,6 +1399,8 @@ button {
     border: 0;
     border-radius: 0;
     box-shadow: none;
+  }
+
   .habit-page {
     padding: 0;
     background: #ffffff;
@@ -1218,8 +1469,18 @@ button {
     padding: 12px;
   }
 
+  .member-id-form {
+    grid-template-columns: 1fr;
+  }
+
+  .member-id-button {
+    width: 100%;
+  }
+
   .invite-button {
     padding: 0 12px;
+  }
+
   .habit-shell {
     padding: 22px 14px 28px;
   }
@@ -1742,4 +2003,3 @@ img.habit-group-avatar {
     grid-template-columns: 1fr;
   }
 }
-}}}
