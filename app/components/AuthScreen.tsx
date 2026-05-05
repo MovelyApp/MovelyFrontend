@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 type AuthMode = "login" | "register";
 type RequestStatus = "idle" | "submitting" | "success" | "error";
@@ -51,7 +51,28 @@ function getFriendlyError(message: string) {
   return message;
 }
 
+function extractToken(responseText: string) {
+  const trimmedText = responseText.trim();
+
+  if (!trimmedText) {
+    return "";
+  }
+
+  try {
+    const data = JSON.parse(trimmedText) as {
+      token?: string;
+      accessToken?: string;
+      jwt?: string;
+    };
+
+    return data.token ?? data.accessToken ?? data.jwt ?? "";
+  } catch {
+    return trimmedText;
+  }
+}
+
 export function AuthScreen({ mode }: AuthScreenProps) {
+  const navigate = useNavigate();
   const copy = authCopy[mode];
   const isRegister = mode === "register";
   const [username, setUsername] = useState("");
@@ -104,15 +125,26 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       }
 
       if (!isRegister && typeof window !== "undefined") {
+        const token = extractToken(responseText);
+
+        if (!token) {
+          throw new Error("Login realizado, mas o backend nao retornou um token.");
+        }
+
         if (remember) {
-          window.localStorage.setItem("movely_token", responseText);
+          window.localStorage.setItem("movely_token", token);
         } else {
-          window.sessionStorage.setItem("movely_token", responseText);
+          window.sessionStorage.setItem("movely_token", token);
         }
       }
 
       setStatus("success");
       setMessage(copy.success);
+
+      if (!isRegister) {
+        navigate("/dashboard");
+        return;
+      }
 
       if (isRegister) {
         setPassword("");

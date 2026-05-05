@@ -2,6 +2,7 @@
 .env
 /node_modules/
 venv
+MovelyBackend/
 
 # React Router
 /.react-router/
