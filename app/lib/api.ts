@@ -5,11 +5,13 @@ export function getToken() {
     return "";
   }
 
-  return (
+  const token = (
     window.localStorage.getItem("movely_token") ??
     window.sessionStorage.getItem("movely_token") ??
     ""
   );
+
+  return token.replace(/^Bearer\s+/i, "").trim();
 }
 
 export function clearToken() {
